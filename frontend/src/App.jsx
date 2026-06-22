@@ -1,0 +1,244 @@
+import { useState } from 'react'
+
+const apiBaseUrl = 'http://localhost:5000/api'
+
+const initialForm = {
+  cups: '',
+  titular: '',
+  billing_days: '',
+  competitor_invoice_amount: '',
+  energy_by_periods: {
+    P1: '',
+    P2: '',
+    P3: '',
+  },
+}
+
+function App() {
+  const [form, setForm] = useState(initialForm)
+  const [errors, setErrors] = useState({})
+  const [preview, setPreview] = useState(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+
+  function updateField(name, value) {
+    setForm((current) => ({ ...current, [name]: value }))
+  }
+
+  function updatePeriod(period, value) {
+    setForm((current) => ({
+      ...current,
+      energy_by_periods: {
+        ...current.energy_by_periods,
+        [period]: value,
+      },
+    }))
+  }
+
+  function buildPayload() {
+    return {
+      cups: form.cups,
+      titular: form.titular,
+      billing_days: Number(form.billing_days),
+      competitor_invoice_amount: Number(form.competitor_invoice_amount),
+      energy_by_periods: {
+        P1: Number(form.energy_by_periods.P1),
+        P2: Number(form.energy_by_periods.P2),
+        P3: Number(form.energy_by_periods.P3),
+      },
+    }
+  }
+
+  async function handlePreview(event) {
+    event.preventDefault()
+    setLoadingPreview(true)
+    setErrors({})
+
+    const response = await fetch(`${apiBaseUrl}/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPayload()),
+    })
+
+    const data = await response.json()
+    setLoadingPreview(false)
+
+    if (!response.ok) {
+      setPreview(null)
+      setErrors(data.errors || {})
+      return
+    }
+
+    setPreview(data)
+  }
+
+  async function handleDownload() {
+    setDownloading(true)
+    setErrors({})
+
+    const response = await fetch(`${apiBaseUrl}/reports/comparison.pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPayload()),
+    })
+
+    setDownloading(false)
+
+    if (!response.ok) {
+      const data = await response.json()
+      setErrors(data.errors || {})
+      return
+    }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'comparison-report.pdf'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <main className="page-shell">
+      <section className="hero-card">
+        <p className="eyebrow">MVP comparativa</p>
+        <h1>Simulacio de factura Som Energia</h1>
+        <p className="hero-copy">
+          Formulari d'una sola pantalla per calcular la comparativa i descarregar l'informe en PDF.
+        </p>
+      </section>
+
+      <div className="layout">
+        <form className="form-card" onSubmit={handlePreview}>
+          <section className="form-section">
+            <h2>Titular i contracte</h2>
+            <label>
+              Titular
+              <input value={form.titular} onChange={(event) => updateField('titular', event.target.value)} />
+              <FieldError error={errors.titular} />
+            </label>
+            <label>
+              CUPS
+              <input value={form.cups} onChange={(event) => updateField('cups', event.target.value)} />
+              <FieldError error={errors.cups} />
+            </label>
+          </section>
+
+          <section className="form-section">
+            <h2>Dades de la factura</h2>
+            <label>
+              Dies d'energia facturada
+              <input
+                type="number"
+                min="1"
+                value={form.billing_days}
+                onChange={(event) => updateField('billing_days', event.target.value)}
+              />
+              <FieldError error={errors.billing_days} />
+            </label>
+            <label>
+              Import factura competència
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.competitor_invoice_amount}
+                onChange={(event) => updateField('competitor_invoice_amount', event.target.value)}
+              />
+              <FieldError error={errors.competitor_invoice_amount} />
+            </label>
+          </section>
+
+          <section className="form-section">
+            <h2>Consum per períodes</h2>
+            <div className="period-grid">
+              {['P1', 'P2', 'P3'].map((period) => (
+                <label key={period}>
+                  {period} (kWh)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.energy_by_periods[period]}
+                    onChange={(event) => updatePeriod(period, event.target.value)}
+                  />
+                  <FieldError error={errors[`energy_by_periods.${period}`]} />
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <div className="actions">
+            <button type="submit" disabled={loadingPreview}>
+              {loadingPreview ? 'Calculant...' : 'Veure resum'}
+            </button>
+            <button type="button" className="secondary" disabled={!preview || downloading} onClick={handleDownload}>
+              {downloading ? 'Generant PDF...' : 'Descarregar PDF'}
+            </button>
+          </div>
+        </form>
+
+        <aside className="summary-card">
+          <h2>Resum</h2>
+          {!preview && <p className="placeholder">Ompliu el formulari i premeu "Veure resum".</p>}
+
+          {preview && (
+            <>
+              <div className="summary-grid">
+                <SummaryItem label="Cost actual" value={formatEuro(preview.comparison.competitor_total)} />
+                <SummaryItem label="Cost Som Energia" value={formatEuro(preview.comparison.som_total)} />
+                <SummaryItem label={preview.comparison.savings_label} value={formatEuro(preview.comparison.savings)} />
+              </div>
+
+              <section className="mini-section">
+                <h3>Dades</h3>
+                <p><strong>Titular:</strong> {preview.customer.titular}</p>
+                <p><strong>CUPS:</strong> {preview.customer.cups}</p>
+                <p><strong>Dies:</strong> {preview.input.billing_days}</p>
+              </section>
+
+              <section className="mini-section">
+                <h3>Detall</h3>
+                <ul className="totals-list">
+                  {preview.breakdown.totals.map((item) => (
+                    <li key={item.label} className={item.is_total ? 'total-row' : ''}>
+                      <span>{item.label}</span>
+                      <strong>{formatEuro(item.amount)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </>
+          )}
+        </aside>
+      </div>
+    </main>
+  )
+}
+
+function FieldError({ error }) {
+  if (!error) {
+    return null
+  }
+
+  return <span className="field-error">{error}</span>
+}
+
+function SummaryItem({ label, value }) {
+  return (
+    <div className="summary-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function formatEuro(amount) {
+  return new Intl.NumberFormat('ca-ES', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(amount)
+}
+
+export default App

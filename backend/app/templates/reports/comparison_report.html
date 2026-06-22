@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      @page {
+        margin: 22mm 18mm;
+        size: A4;
+      }
+
+      :root {
+        --bg: #eef1e8;
+        --ink: #1c2d2c;
+        --muted: #66716d;
+        --brand: #17464c;
+        --accent: #d3f85c;
+        --soft: #b8b3ea;
+        --line: #d7ded3;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        font-size: 12px;
+      }
+
+      .page {
+        min-height: 100%;
+      }
+
+      .hero, .section {
+        page-break-after: always;
+      }
+
+      .hero h1 {
+        font-size: 28px;
+        margin: 0 0 16px;
+      }
+
+      .hero p {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: var(--accent);
+        font-weight: bold;
+        margin-top: 18px;
+      }
+
+      h2 {
+        font-size: 24px;
+        margin: 0 0 16px;
+      }
+
+      h3 {
+        font-size: 18px;
+        margin: 24px 0 12px;
+      }
+
+      .summary-table, .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .summary-table th {
+        background: var(--soft);
+        padding: 10px;
+        text-align: center;
+      }
+
+      .summary-table td {
+        background: #ffffff;
+        padding: 12px;
+        text-align: center;
+        font-size: 18px;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin: 18px 0;
+      }
+
+      .card {
+        background: #ffffff;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+
+      .meta-row {
+        margin-bottom: 8px;
+      }
+
+      .meta-row strong {
+        display: inline-block;
+        min-width: 80px;
+      }
+
+      .detail-table td {
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .detail-table td:last-child {
+        text-align: right;
+      }
+
+      .detail-table .total td {
+        background: var(--brand);
+        color: #ffffff;
+        font-weight: bold;
+      }
+
+      .energy-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .energy-table th,
+      .energy-table td {
+        padding: 8px;
+        border: 1px solid var(--line);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      ul {
+        padding-left: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page hero">
+      <h1>Simulacio de factura Som Energia</h1>
+      <p>
+        Aquest informe compara l'import actual de la factura amb el cost estimat segons la tarifa
+        configurada de Som Energia. El calcul es genera exclusivament amb les dades entrades al formulari.
+      </p>
+      <p>
+        Titular: <strong>{{ report.customer.titular }}</strong><br>
+        CUPS: <strong>{{ report.customer.cups }}</strong>
+      </p>
+      <div class="badge">Tarifa {{ report.pricing.tariff_name }} · Vigent des de {{ report.pricing.effective_date }}</div>
+    </section>
+
+    <section class="page section">
+      <h2>Simulacio de cost de la factura</h2>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Cost actual</th>
+            <th>Cost amb Som Energia</th>
+            <th>{{ report.comparison.savings_label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{{ euro(report.comparison.competitor_total) }}</td>
+            <td>{{ euro(report.comparison.som_total) }}</td>
+            <td>{{ euro(report.comparison.savings) }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="detail-grid">
+        <div class="card">
+          <h3>Dades de la factura</h3>
+          <div class="meta-row"><strong>Titular:</strong> {{ report.customer.titular }}</div>
+          <div class="meta-row"><strong>CUPS:</strong> {{ report.customer.cups }}</div>
+          <div class="meta-row"><strong>Dies:</strong> {{ report.input.billing_days }}</div>
+        </div>
+
+        <div class="card">
+          <h3>Energia per periodes</h3>
+          <table class="energy-table">
+            <thead>
+              <tr>
+                <th>Periode</th>
+                <th>kWh</th>
+                <th>Preu</th>
+                <th>Import</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in report.breakdown.energy %}
+              <tr>
+                <td>{{ item.period }}</td>
+                <td>{{ item.kwh }}</td>
+                <td>{{ euro(item.unit_price) }}</td>
+                <td>{{ euro(item.amount) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3>Detall del calcul</h3>
+      <table class="detail-table">
+        <tbody>
+          {% for item in report.breakdown.totals %}
+          <tr class="{% if item.is_total %}total{% endif %}">
+            <td>{{ item.label }}</td>
+            <td>{{ euro(item.amount) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <p class="muted">
+        Aquesta simulacio nomes es valida per aquestes dades d'entrada. No s'ha d'extrapolar automaticament a altres factures.
+      </p>
+    </section>
+
+    <section class="page">
+      <h2>Com et pots unir a Som Energia?</h2>
+      <p>
+        Aquest MVP deixa el bloc comercial en plantilla HTML per facilitar canvis de copy, imatges i CTA sense tocar el motor de calcul.
+      </p>
+
+      <h3>Serveis inclosos</h3>
+      <ul>
+        <li>Electricitat 100% renovable certificada.</li>
+        <li>Comparativa transparent basada en preus de configuracio.</li>
+        <li>Plantilla PDF desacoblada del calcul per poder iterar el disseny.</li>
+      </ul>
+    </section>
+  </body>
+  </html>

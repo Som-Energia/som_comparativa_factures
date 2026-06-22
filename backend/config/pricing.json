@@ -1,0 +1,15 @@
+{
+  "tariff_name": "2.0TD Periodes",
+  "effective_date": "2026-05-01",
+  "currency": "EUR",
+  "energy_prices_eur_per_kwh": {
+    "P1": 0.159,
+    "P2": 0.124,
+    "P3": 0.097
+  },
+  "regulated_charge_eur_per_day": 0.1237,
+  "social_bonus_eur_per_day": 0.019,
+  "meter_rental_eur": 0.81,
+  "electric_tax_rate": 0.0511,
+  "vat_rate": 0.21
+}
