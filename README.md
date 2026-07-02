@@ -7,6 +7,7 @@ MVP per generar una comparativa de factura amb Som Energia a partir d'un formula
 - `frontend/`: React + Vite, formulari d'una sola pantalla i resum previ.
 - `backend/`: Flask API amb validacio, calcul i render HTML a PDF.
 - `backend/config/pricing.json`: configuracio de preus, impostos i literals de tarifa.
+- `backend/config/pdf_templates/comparison/v1/`: contracte editable de `content.yaml`, `theme.yaml` i `assets.yaml`.
 
 ## Contracte minim d'entrada
 
@@ -52,4 +53,5 @@ Per defecte el frontend apunta a `http://localhost:5000/api`.
 
 - El calcul i el render del PDF estan separats.
 - El PDF s'obte a partir d'una plantilla HTML/Jinja.
+- El contracte editable del template viu a `backend/config/pdf_templates/comparison/v1/README.md`.
 - El layout actual es un MVP inspirat en l'exemple aportat; falta iterar-lo per clonar fidelment la plantilla final.
