@@ -88,11 +88,11 @@ def _resolve_template_bundle(template_id: str, version: str | None = None) -> Te
 
     content = _load_yaml_file(bundle.content_path)
     theme = _load_yaml_file(bundle.theme_path)
-    assets = _load_yaml_file(bundle.assets_manifest_path)
+    assets_manifest = _load_yaml_file(bundle.assets_manifest_path)
 
     _validate_content_template(content)
     _validate_theme_template(theme)
-    _validate_assets_template(assets, bundle.assets_dir)
+    assets = _resolve_assets_manifest(assets_manifest, bundle.assets_dir)
 
     bundle = TemplateBundle(
         template_id=template_id,
@@ -259,17 +259,51 @@ def _validate_theme_template(theme: dict[str, Any]) -> None:
 
 
 def _validate_assets_template(assets_payload: dict[str, Any], assets_dir: Path) -> None:
-    _validate_exact_keys(assets_payload, "assets", required={"meta", "assets"})
+    _validate_exact_keys(assets_payload, "assets", required={"meta", "registry", "slots"})
 
     meta = _expect_dict(assets_payload["meta"], "assets.meta")
     _validate_exact_keys(meta, "assets.meta", required={"template_id", "template_version"})
     _validate_fixed_string(meta["template_id"], "assets.meta.template_id", "comparison")
     _validate_integer(meta["template_version"], "assets.meta.template_version", exact=1)
 
-    assets = _expect_dict(assets_payload["assets"], "assets.assets")
-    _validate_exact_keys(assets, "assets.assets", required={"logo", "hero_illustration"})
-    _validate_asset_entry(assets["logo"], "assets.assets.logo", assets_dir, min_width=40, max_width=240, max_alt_length=80)
-    _validate_asset_entry(assets["hero_illustration"], "assets.assets.hero_illustration", assets_dir, min_width=80, max_width=320, max_alt_length=120)
+    registry = _expect_dict(assets_payload["registry"], "assets.registry")
+    for asset_id, entry in registry.items():
+        if not isinstance(asset_id, str) or not asset_id:
+            raise TemplateValidationError("assets.registry nomes admet ids de text no buits.")
+        _validate_asset_id(asset_id, "assets.registry")
+        max_alt_length = 80 if asset_id.startswith("logo") else 120
+        min_width = 40 if asset_id.startswith("logo") else 80
+        max_width = 240 if asset_id.startswith("logo") else 320
+        _validate_asset_entry(entry, f"assets.registry.{asset_id}", assets_dir, min_width=min_width, max_width=max_width, max_alt_length=max_alt_length)
+
+    slots = _expect_dict(assets_payload["slots"], "assets.slots")
+    _validate_exact_keys(slots, "assets.slots", required={"logo", "hero_illustration"})
+    _validate_asset_slot(slots["logo"], "assets.slots.logo", registry)
+    _validate_asset_slot(slots["hero_illustration"], "assets.slots.hero_illustration", registry)
+
+
+def _resolve_assets_manifest(assets_payload: dict[str, Any], assets_dir: Path) -> dict[str, Any]:
+    _validate_assets_template(assets_payload, assets_dir)
+
+    registry = assets_payload["registry"]
+    slots = assets_payload["slots"]
+
+    resolved_slots: dict[str, Any] = {}
+    for slot_name, asset_id in slots.items():
+        if asset_id is None:
+            resolved_slots[slot_name] = None
+            continue
+
+        entry = registry[asset_id]
+        resolved_path = _validate_asset_path(entry["path"], f"assets.registry.{asset_id}.path", assets_dir)
+        resolved_slots[slot_name] = {
+            "id": asset_id,
+            "src": resolved_path.as_uri(),
+            "alt": entry["alt"],
+            "max_width_px": entry["max_width_px"],
+        }
+
+    return resolved_slots
 
 
 def _validate_cta_action(value: Any, path: str) -> None:
@@ -298,6 +332,23 @@ def _validate_asset_entry(value: Any, path: str, assets_dir: Path, *, min_width:
 
     if asset_path.stat().st_size > MAX_ASSET_SIZE_BYTES:
         raise TemplateValidationError(f"{path}.path supera el limit de 2 MB.")
+
+
+def _validate_asset_slot(value: Any, path: str, registry: dict[str, Any]) -> None:
+    if value is None:
+        return
+
+    if not isinstance(value, str):
+        raise TemplateValidationError(f"{path} ha de ser `null` o un id d'asset.")
+
+    _validate_asset_id(value, path)
+    if value not in registry:
+        raise TemplateValidationError(f"{path} referencia un asset no declarat: {value}.")
+
+
+def _validate_asset_id(value: str, path: str) -> None:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", value):
+        raise TemplateValidationError(f"{path} ha de fer servir ids en minuscules amb `a-z0-9._-`.")
 
 
 def _validate_asset_path(value: Any, path: str, assets_dir: Path) -> Path:

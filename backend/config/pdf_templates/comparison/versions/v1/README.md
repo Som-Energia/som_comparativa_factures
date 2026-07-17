@@ -109,20 +109,19 @@ La renderitzacio continua controlada pel backend; aquests YAML nomes declaren da
 | --- | --- | --- | --- |
 | `meta.template_id` | string | si | valor fix `comparison` |
 | `meta.template_version` | integer | si | valor fix `1` |
-| `assets.logo` | object\|null | no | logo del template |
-| `assets.logo.path` | string | si si hi ha logo | ruta relativa, 1-120 caracters, extensio `.png`, `.jpg`, `.jpeg` o `.svg` |
-| `assets.logo.alt` | string | si si hi ha logo | 1-80 caracters |
-| `assets.logo.max_width_px` | integer | si si hi ha logo | 40-240 |
-| `assets.hero_illustration` | object\|null | no | imatge decorativa de portada |
-| `assets.hero_illustration.path` | string | si si hi ha il.lustracio | mateixa regla que `logo.path` |
-| `assets.hero_illustration.alt` | string | si si hi ha il.lustracio | 1-120 caracters |
-| `assets.hero_illustration.max_width_px` | integer | si si hi ha il.lustracio | 80-320 |
+| `registry` | object | si | cataleg d'assets aprovats per id |
+| `registry.<asset_id>.path` | string | si | ruta relativa, 1-120 caracters, extensio `.png`, `.jpg`, `.jpeg` o `.svg` |
+| `registry.<asset_id>.alt` | string | si | 1-80 caracters per logos, 1-120 per il.lustracions |
+| `registry.<asset_id>.max_width_px` | integer | si | 40-240 per logos, 80-320 per il.lustracions |
+| `slots.logo` | string\|null | si | `null` o id d'un asset aprovat de `registry` |
+| `slots.hero_illustration` | string\|null | si | `null` o id d'un asset aprovat de `registry` |
 
 Regles addicionals d'assets:
 
 - Les rutes son relatives a `backend/assets/pdf_templates/comparison/versions/v1/`.
 - No es permeten fitxers de mes de 2 MB.
 - No es permeten esquemes remots (`http://`, `https://`) ni `data:`.
+- El template consumeix assets resolts per slot (`logo`, `hero_illustration`), no paths lliures.
 
 ### Mapeig directe amb el template actual
 
