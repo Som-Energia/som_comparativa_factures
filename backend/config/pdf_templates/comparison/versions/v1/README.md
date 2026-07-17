@@ -36,6 +36,11 @@ La renderitzacio continua controlada pel backend; aquests YAML nomes declaren da
   - `{comparison.savings_label}`
 - Cap camp pot contenir `<`, `>`, `{%`, `{{`, `}}` o `</`.
 - Claus desconegudes s'han de rebutjar en validacio.
+- Cada manifest ha de declarar el mateix numero que la seva versio de directori: `v1` usa `template_version: 1`, `v2` usa `template_version: 2`.
+
+### Publicacio i rollback
+
+La versio productiva es la indicada a `backend/config/pdf_templates/comparison/published.json`. Cal publicar-la amb `python manage_templates.py publish comparison vN`, que valida tot el bundle abans d'actualitzar el punter. Per fer rollback, s'executa `python manage_templates.py rollback comparison vN` amb una versio valida anterior.
 
 ### Contracte de `content.yaml`
 

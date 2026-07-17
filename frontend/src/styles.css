@@ -16,19 +16,22 @@ body {
 
 button,
 input,
+select,
+textarea,
 small {
   font: inherit;
 }
 
 .page-shell {
-  max-width: 1280px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 32px 20px 48px;
 }
 
 .hero-card,
 .form-card,
-.summary-card {
+.summary-card,
+.editor-panel {
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(23, 70, 76, 0.08);
   border-radius: 24px;
@@ -47,16 +50,22 @@ small {
   color: #486765;
 }
 
-.hero-card h1 {
+.hero-card h1,
+.editor-header-row h2 {
   margin: 8px 0 12px;
-  font-size: clamp(2rem, 4vw, 3.5rem);
 }
 
 .hero-copy {
-  max-width: 680px;
+  max-width: 760px;
   margin: 0;
   font-size: 1.05rem;
   line-height: 1.5;
+}
+
+.screen-switcher {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .layout {
@@ -66,8 +75,16 @@ small {
   align-items: start;
 }
 
+.editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
 .form-card,
-.summary-card {
+.summary-card,
+.editor-panel {
   padding: 24px;
 }
 
@@ -81,19 +98,111 @@ small {
   font-size: 1.25rem;
 }
 
+.editor-header-row,
+.section-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.published-pill,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f5f9ef;
+  color: #17464c;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.status-pill.published {
+  background: #17464c;
+  color: #ffffff;
+}
+
+.status-pill.historical {
+  background: #ece8ff;
+  color: #4b4178;
+}
+
+.status-card {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f7faf4;
+}
+
+.status-card p,
+.section-copy {
+  margin: 12px 0 0;
+  color: #5c6c67;
+  line-height: 1.5;
+}
+
+.editor-toolbar,
+.create-version-row,
+.editor-tabs,
+.editor-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.editor-toolbar,
+.create-version-row {
+  margin-top: 20px;
+  align-items: end;
+}
+
+.editor-toolbar label,
+.create-version-row label {
+  flex: 1;
+}
+
 label {
   display: block;
   margin-bottom: 16px;
   font-weight: 600;
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   margin-top: 8px;
   padding: 12px 14px;
   border: 1px solid #cbd7cc;
   border-radius: 14px;
   background: #ffffff;
+}
+
+.yaml-editor {
+  min-height: 520px;
+  resize: vertical;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  line-height: 1.45;
+  margin-top: 16px;
+}
+
+.preview-panel {
+  min-height: 780px;
+}
+
+.preview-frame {
+  width: 100%;
+  min-height: 680px;
+  margin-top: 16px;
+  border: 1px solid #d8dfd5;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.preview-error {
+  margin: 16px 0 0;
+  color: #b32944;
+  font-weight: 600;
 }
 
 .period-grid {
@@ -129,7 +238,10 @@ button.tertiary {
   border: 1px solid #cbd7cc;
 }
 
-button:disabled {
+button:disabled,
+textarea:disabled,
+select:disabled,
+input:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -148,6 +260,12 @@ button:disabled {
   color: #5c6c67;
   font-size: 0.9rem;
   font-weight: 400;
+}
+
+.status-message {
+  margin: 12px 0 0;
+  color: #17464c;
+  font-weight: 600;
 }
 
 .placeholder {
@@ -201,16 +319,22 @@ button:disabled {
   font-weight: 800;
 }
 
+@media (max-width: 1100px) {
+  .layout,
+  .editor-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .period-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .actions {
+  .period-grid,
+  .actions,
+  .screen-switcher,
+  .editor-toolbar,
+  .create-version-row,
+  .editor-tabs,
+  .editor-actions,
+  .editor-header-row {
     flex-direction: column;
   }
 }

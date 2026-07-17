@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 import re
+from shutil import copytree
+import tempfile
 from typing import Any
 from urllib.parse import urlparse
 
@@ -38,6 +41,12 @@ class TemplateBundle:
     assets: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class TemplateVersionInfo:
+    version: str
+    status: str
+
+
 ALLOWED_TEMPLATE_TOKENS = {
     "customer.titular",
     "customer.cups",
@@ -50,6 +59,7 @@ FORBIDDEN_TEXT_FRAGMENTS = ("{{", "{%", "}}", "</", "<", ">")
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 ALLOWED_ASSET_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg"}
 MAX_ASSET_SIZE_BYTES = 2 * 1024 * 1024
+TEMPLATE_VERSION_PATTERN = re.compile(r"^v([1-9][0-9]*)$")
 
 
 @lru_cache(maxsize=1)
@@ -62,9 +72,144 @@ def resolve_comparison_template_bundle(version: str | None = None) -> TemplateBu
     return _resolve_template_bundle("comparison", version=version)
 
 
+def get_published_comparison_template_version() -> str:
+    return _load_published_template_version(PDF_TEMPLATES_DIR / "comparison")
+
+
+def publish_comparison_template_version(version: str) -> TemplateBundle:
+    template_dir = PDF_TEMPLATES_DIR / "comparison"
+    bundle = _resolve_template_bundle("comparison", version=version)
+    _write_published_template_version(template_dir, bundle.version)
+    return bundle
+
+
+def rollback_comparison_template_version(version: str) -> TemplateBundle:
+    return publish_comparison_template_version(version)
+
+
+def list_comparison_template_versions() -> list[TemplateVersionInfo]:
+    template_dir = PDF_TEMPLATES_DIR / "comparison"
+    published_version = get_published_comparison_template_version()
+    published_number = _extract_template_version_number(published_version)
+    versions_dir = template_dir / "versions"
+
+    version_infos: list[TemplateVersionInfo] = []
+    for version_dir in versions_dir.iterdir():
+        if not version_dir.is_dir():
+            continue
+
+        version = _parse_template_version(version_dir.name)
+        version_number = _extract_template_version_number(version)
+        if version == published_version:
+            status = "published"
+        elif version_number < published_number:
+            status = "historical"
+        else:
+            status = "draft"
+
+        version_infos.append(TemplateVersionInfo(version=version, status=status))
+
+    return sorted(version_infos, key=lambda item: _extract_template_version_number(item.version), reverse=True)
+
+
+def get_comparison_template_version_files(version: str) -> dict[str, Any]:
+    bundle = _resolve_template_bundle("comparison", version=version)
+    status = _get_template_version_status(bundle.version)
+    return {
+        "version": bundle.version,
+        "status": status,
+        "files": {
+            "content": bundle.content_path.read_text(encoding="utf-8"),
+            "theme": bundle.theme_path.read_text(encoding="utf-8"),
+            "assets": bundle.assets_manifest_path.read_text(encoding="utf-8"),
+        },
+    }
+
+
+def create_comparison_template_version(*, source_version: str, target_version: str) -> dict[str, Any]:
+    template_dir = PDF_TEMPLATES_DIR / "comparison"
+    source_bundle = _resolve_template_bundle("comparison", version=source_version)
+    target_version = _parse_template_version(target_version)
+    source_number = _extract_template_version_number(source_bundle.version)
+    target_number = _extract_template_version_number(target_version)
+
+    if target_number <= source_number:
+        raise TemplateValidationError("La nova versio ha de ser superior a la versio base.")
+
+    target_version_dir = template_dir / "versions" / target_version
+    target_assets_dir = ASSETS_DIR / "pdf_templates" / "comparison" / "versions" / target_version
+    if target_version_dir.exists() or target_assets_dir.exists():
+        raise TemplateValidationError(f"La versio '{target_version}' ja existeix.")
+
+    copytree(source_bundle.version_dir, target_version_dir)
+    copytree(source_bundle.assets_dir, target_assets_dir)
+
+    try:
+        files = {
+            "content": (target_version_dir / "content.yaml").read_text(encoding="utf-8").replace(
+                f"template_version: {source_number}",
+                f"template_version: {target_number}",
+            ),
+            "theme": (target_version_dir / "theme.yaml").read_text(encoding="utf-8").replace(
+                f"template_version: {source_number}",
+                f"template_version: {target_number}",
+            ),
+            "assets": (target_version_dir / "assets.yaml").read_text(encoding="utf-8").replace(
+                f"template_version: {source_number}",
+                f"template_version: {target_number}",
+            ),
+        }
+        _write_template_files(version=target_version, files=files)
+        return get_comparison_template_version_files(target_version)
+    except Exception:
+        _delete_version_dirs(target_version_dir, target_assets_dir)
+        raise
+
+
+def update_comparison_template_version_files(version: str, files: dict[str, str]) -> dict[str, Any]:
+    _ensure_template_version_is_editable(version)
+    _write_template_files(version=version, files=files)
+    return get_comparison_template_version_files(version)
+
+
+def preview_comparison_template_version(version: str, files: dict[str, str]) -> TemplateBundle:
+    resolved_version = _parse_template_version(version)
+    version_dir = PDF_TEMPLATES_DIR / "comparison" / "versions" / resolved_version
+    assets_dir = ASSETS_DIR / "pdf_templates" / "comparison" / "versions" / resolved_version
+
+    if not version_dir.is_dir():
+        raise TemplateResolutionError(f"La versio '{resolved_version}' del template 'comparison' no existeix.")
+    if not assets_dir.is_dir():
+        raise TemplateResolutionError(
+            f"La versio '{resolved_version}' del template 'comparison' no te directori d'assets: {_describe_path(assets_dir)}."
+        )
+
+    version_number = _extract_template_version_number(resolved_version)
+    content = _load_yaml_string(files["content"], "content.yaml")
+    theme = _load_yaml_string(files["theme"], "theme.yaml")
+    assets_payload = _load_yaml_string(files["assets"], "assets.yaml")
+    _validate_content_template(content, version_number)
+    _validate_theme_template(theme, version_number)
+    assets = _resolve_assets_manifest(assets_payload, assets_dir, version_number)
+
+    return TemplateBundle(
+        template_id="comparison",
+        version=resolved_version,
+        version_dir=version_dir,
+        content_path=version_dir / "content.yaml",
+        theme_path=version_dir / "theme.yaml",
+        assets_manifest_path=version_dir / "assets.yaml",
+        assets_dir=assets_dir,
+        content=content,
+        theme=theme,
+        assets=assets,
+    )
+
+
 def _resolve_template_bundle(template_id: str, version: str | None = None) -> TemplateBundle:
     template_dir = PDF_TEMPLATES_DIR / template_id
     resolved_version = version or _load_published_template_version(template_dir)
+    version_number = _extract_template_version_number(resolved_version)
     version_dir = template_dir / "versions" / resolved_version
 
     if not version_dir.is_dir():
@@ -90,9 +235,9 @@ def _resolve_template_bundle(template_id: str, version: str | None = None) -> Te
     theme = _load_yaml_file(bundle.theme_path)
     assets_manifest = _load_yaml_file(bundle.assets_manifest_path)
 
-    _validate_content_template(content)
-    _validate_theme_template(theme)
-    assets = _resolve_assets_manifest(assets_manifest, bundle.assets_dir)
+    _validate_content_template(content, version_number)
+    _validate_theme_template(theme, version_number)
+    assets = _resolve_assets_manifest(assets_manifest, bundle.assets_dir, version_number)
 
     bundle = TemplateBundle(
         template_id=template_id,
@@ -116,20 +261,66 @@ def _load_published_template_version(template_dir: Path) -> str:
             f"Falta el fitxer de publicacio del template '{template_dir.name}'."
         )
 
-    with published_path.open("r", encoding="utf-8") as handle:
-        payload = json.load(handle)
-
-    version = str(payload.get("current_version", "")).strip()
-    if not version:
+    try:
+        with published_path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except json.JSONDecodeError as exc:
         raise TemplateResolutionError(
-            f"El fitxer de publicacio del template '{template_dir.name}' no defineix 'current_version'."
+            f"El fitxer de publicacio del template '{template_dir.name}' no es un JSON valid."
+        ) from exc
+
+    if not isinstance(payload, dict) or set(payload) != {"current_version"}:
+        raise TemplateResolutionError(
+            f"El fitxer de publicacio del template '{template_dir.name}' ha de contenir nomes 'current_version'."
         )
-    return version
+
+    version = payload["current_version"]
+    if not isinstance(version, str):
+        raise TemplateResolutionError(
+            f"El fitxer de publicacio del template '{template_dir.name}' ha de definir 'current_version' com a text."
+        )
+    return _parse_template_version(version)
+
+
+def _write_published_template_version(template_dir: Path, version: str) -> None:
+    published_path = template_dir / "published.json"
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=template_dir,
+        prefix=".published-",
+        suffix=".json",
+        delete=False,
+    ) as handle:
+        json.dump({"current_version": version}, handle, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+        temporary_path = Path(handle.name)
+
+    try:
+        os.replace(temporary_path, published_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _parse_template_version(version: str) -> str:
+    normalized_version = version.strip()
+    if not TEMPLATE_VERSION_PATTERN.fullmatch(normalized_version):
+        raise TemplateResolutionError("La versio de template ha de tenir el format 'v' seguit d'un enter positiu.")
+    return normalized_version
+
+
+def _extract_template_version_number(version: str) -> int:
+    normalized_version = _parse_template_version(version)
+    match = TEMPLATE_VERSION_PATTERN.fullmatch(normalized_version)
+    assert match is not None
+    return int(match.group(1))
 
 
 def _validate_template_bundle(bundle: TemplateBundle) -> None:
     missing_files = [
-        str(path.relative_to(Path(__file__).resolve().parents[1]))
+        _describe_path(path)
         for path in (bundle.content_path, bundle.theme_path, bundle.assets_manifest_path)
         if not path.is_file()
     ]
@@ -139,7 +330,7 @@ def _validate_template_bundle(bundle: TemplateBundle) -> None:
         )
 
     if not bundle.assets_dir.is_dir():
-        assets_path = bundle.assets_dir.relative_to(Path(__file__).resolve().parents[1])
+        assets_path = _describe_path(bundle.assets_dir)
         raise TemplateResolutionError(
             f"La versio '{bundle.version}' del template '{bundle.template_id}' no te directori d'assets: {assets_path}."
         )
@@ -158,13 +349,25 @@ def _load_yaml_file(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _validate_content_template(content: dict[str, Any]) -> None:
+def _load_yaml_string(raw_text: str, filename: str) -> dict[str, Any]:
+    try:
+        payload = yaml.safe_load(raw_text)
+    except yaml.YAMLError as exc:
+        raise TemplateValidationError(f"El fitxer '{filename}' no es un YAML valid.") from exc
+
+    if not isinstance(payload, dict):
+        raise TemplateValidationError(f"El fitxer '{filename}' ha de definir un objecte YAML al nivell arrel.")
+
+    return payload
+
+
+def _validate_content_template(content: dict[str, Any], expected_version: int) -> None:
     _validate_exact_keys(content, "content", required={"meta", "hero", "summary", "invoice_card", "energy_table", "breakdown", "legal", "cta"})
 
     meta = _expect_dict(content["meta"], "content.meta")
     _validate_exact_keys(meta, "content.meta", required={"template_id", "template_version", "locale"})
     _validate_fixed_string(meta["template_id"], "content.meta.template_id", "comparison")
-    _validate_integer(meta["template_version"], "content.meta.template_version", exact=1)
+    _validate_integer(meta["template_version"], "content.meta.template_version", exact=expected_version)
     _validate_fixed_string(meta["locale"], "content.meta.locale", "ca")
 
     hero = _expect_dict(content["hero"], "content.hero")
@@ -218,13 +421,13 @@ def _validate_content_template(content: dict[str, Any]) -> None:
     _validate_cta_action(cta["primary_action"], "content.cta.primary_action")
 
 
-def _validate_theme_template(theme: dict[str, Any]) -> None:
+def _validate_theme_template(theme: dict[str, Any], expected_version: int) -> None:
     _validate_exact_keys(theme, "theme", required={"meta", "page", "colors", "typography", "shape", "spacing"})
 
     meta = _expect_dict(theme["meta"], "theme.meta")
     _validate_exact_keys(meta, "theme.meta", required={"template_id", "template_version"})
     _validate_fixed_string(meta["template_id"], "theme.meta.template_id", "comparison")
-    _validate_integer(meta["template_version"], "theme.meta.template_version", exact=1)
+    _validate_integer(meta["template_version"], "theme.meta.template_version", exact=expected_version)
 
     page = _expect_dict(theme["page"], "theme.page")
     _validate_exact_keys(page, "theme.page", required={"size", "margin_mm"})
@@ -258,13 +461,13 @@ def _validate_theme_template(theme: dict[str, Any]) -> None:
     _validate_integer(spacing["table_cell_px"], "theme.spacing.table_cell_px", min_value=6, max_value=16)
 
 
-def _validate_assets_template(assets_payload: dict[str, Any], assets_dir: Path) -> None:
+def _validate_assets_template(assets_payload: dict[str, Any], assets_dir: Path, expected_version: int) -> None:
     _validate_exact_keys(assets_payload, "assets", required={"meta", "registry", "slots"})
 
     meta = _expect_dict(assets_payload["meta"], "assets.meta")
     _validate_exact_keys(meta, "assets.meta", required={"template_id", "template_version"})
     _validate_fixed_string(meta["template_id"], "assets.meta.template_id", "comparison")
-    _validate_integer(meta["template_version"], "assets.meta.template_version", exact=1)
+    _validate_integer(meta["template_version"], "assets.meta.template_version", exact=expected_version)
 
     registry = _expect_dict(assets_payload["registry"], "assets.registry")
     for asset_id, entry in registry.items():
@@ -282,8 +485,8 @@ def _validate_assets_template(assets_payload: dict[str, Any], assets_dir: Path) 
     _validate_asset_slot(slots["hero_illustration"], "assets.slots.hero_illustration", registry)
 
 
-def _resolve_assets_manifest(assets_payload: dict[str, Any], assets_dir: Path) -> dict[str, Any]:
-    _validate_assets_template(assets_payload, assets_dir)
+def _resolve_assets_manifest(assets_payload: dict[str, Any], assets_dir: Path, expected_version: int) -> dict[str, Any]:
+    _validate_assets_template(assets_payload, assets_dir, expected_version)
 
     registry = assets_payload["registry"]
     slots = assets_payload["slots"]
@@ -463,3 +666,81 @@ def _validate_https_url(value: Any, path: str, *, min_length: int, max_length: i
     parsed = urlparse(url)
     if parsed.scheme != "https" or not parsed.netloc:
         raise TemplateValidationError(f"{path} ha de ser una URL absoluta amb https.")
+
+
+def _describe_path(path: Path) -> str:
+    backend_root = Path(__file__).resolve().parents[1]
+    try:
+        return str(path.relative_to(backend_root))
+    except ValueError:
+        return str(path)
+
+
+def _get_template_version_status(version: str) -> str:
+    published_version = get_published_comparison_template_version()
+    version_number = _extract_template_version_number(version)
+    published_number = _extract_template_version_number(published_version)
+    if version == published_version:
+        return "published"
+    if version_number < published_number:
+        return "historical"
+    return "draft"
+
+
+def _ensure_template_version_is_editable(version: str) -> None:
+    status = _get_template_version_status(version)
+    if status != "draft":
+        raise TemplateValidationError(f"La versio '{version}' no es editable perque esta {status}.")
+
+
+def _write_template_files(*, version: str, files: dict[str, str]) -> None:
+    required = {"content", "theme", "assets"}
+    if set(files) != required:
+        raise TemplateValidationError("Cal enviar exactament els fitxers content, theme i assets.")
+
+    preview_comparison_template_version(version, files)
+
+    version_dir = PDF_TEMPLATES_DIR / "comparison" / "versions" / version
+    _write_text_atomic(version_dir / "content.yaml", files["content"])
+    _write_text_atomic(version_dir / "theme.yaml", files["theme"])
+    _write_text_atomic(version_dir / "assets.yaml", files["assets"])
+
+
+def _write_text_atomic(path: Path, content: str) -> None:
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.stem}-",
+        suffix=path.suffix,
+        delete=False,
+    ) as handle:
+        handle.write(content)
+        if not content.endswith("\n"):
+            handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+        temporary_path = Path(handle.name)
+
+    try:
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _delete_version_dirs(version_dir: Path, assets_dir: Path) -> None:
+    if version_dir.exists():
+        for path in sorted(version_dir.rglob("*"), reverse=True):
+            if path.is_file():
+                path.unlink()
+            else:
+                path.rmdir()
+        version_dir.rmdir()
+
+    if assets_dir.exists():
+        for path in sorted(assets_dir.rglob("*"), reverse=True):
+            if path.is_file():
+                path.unlink()
+            else:
+                path.rmdir()
+        assets_dir.rmdir()

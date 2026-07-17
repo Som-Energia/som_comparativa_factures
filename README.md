@@ -57,4 +57,19 @@ Per defecte el frontend apunta a `http://localhost:5000/api`.
 - El PDF s'obte a partir d'una plantilla HTML/Jinja.
 - La versio publicada del template es resol des de `backend/config/pdf_templates/comparison/published.json`.
 - El contracte editable del template viu a `backend/config/pdf_templates/comparison/versions/v1/README.md`.
+
+## Publicacio de plantilles
+
+La plantilla productiva es la versio indicada per `published.json`. Per publicar una versio, el backend valida tot el bundle abans d'actualitzar aquest punter de manera atomica:
+
+```bash
+cd backend
+poetry run python manage_templates.py publish comparison v1
+```
+
+El rollback es fa publicant una versio anterior valida:
+
+```bash
+poetry run python manage_templates.py rollback comparison v1
+```
 - El layout actual es un MVP inspirat en l'exemple aportat; falta iterar-lo per clonar fidelment la plantilla final.
