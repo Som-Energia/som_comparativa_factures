@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const apiBaseUrl = 'http://localhost:5000/api'
 
@@ -21,6 +21,39 @@ function App() {
   const [preview, setPreview] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [publishedVersion, setPublishedVersion] = useState(null)
+  const [loadingPublication, setLoadingPublication] = useState(true)
+  const [publishingAction, setPublishingAction] = useState('')
+  const [publicationMessage, setPublicationMessage] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPublicationStatus() {
+      setLoadingPublication(true)
+
+      const response = await fetch(`${apiBaseUrl}/templates/comparison/publication`)
+      const data = await response.json()
+
+      if (cancelled) {
+        return
+      }
+
+      setLoadingPublication(false)
+      if (!response.ok) {
+        setErrors((current) => ({ ...current, ...(data.errors || {}) }))
+        return
+      }
+
+      setPublishedVersion(data.published_version)
+    }
+
+    loadPublicationStatus()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }))
@@ -107,6 +140,36 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  async function handleTemplatePublication(action) {
+    const templateVersion = form.template_version.trim()
+    if (!templateVersion) {
+      setErrors((current) => ({ ...current, template_version: 'Cal indicar una versio de plantilla.' }))
+      return
+    }
+
+    setPublishingAction(action)
+    setPublicationMessage('')
+    setErrors((current) => ({ ...current, template_version: undefined, publication: undefined }))
+
+    const response = await fetch(`${apiBaseUrl}/templates/comparison/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_version: templateVersion }),
+    })
+
+    const data = await response.json()
+    setPublishingAction('')
+
+    if (!response.ok) {
+      setErrors((current) => ({ ...current, ...(data.errors || {}) }))
+      return
+    }
+
+    setErrors((current) => ({ ...current, template_version: undefined, publication: undefined }))
+    setPublishedVersion(data.published_version)
+    setPublicationMessage(data.message)
+  }
+
   function handleOpenHtmlPreview() {
     const templateVersion = form.template_version.trim()
     const previewUrl = new URL(`${apiBaseUrl}/reports/comparison.preview`)
@@ -179,6 +242,38 @@ function App() {
               </small>
               <FieldError error={errors.template_version} />
             </label>
+          </section>
+
+          <section className="form-section template-admin-section">
+            <div className="section-heading-row">
+              <h2>Publicació de plantilla</h2>
+              <span className="published-pill">
+                {loadingPublication ? 'Carregant...' : `Publicada: ${publishedVersion || 'No disponible'}`}
+              </span>
+            </div>
+            <p className="section-copy">
+              La versió indicada al camp superior es pot publicar directament o utilitzar-se com a rollback cap a una versió anterior vàlida.
+            </p>
+            <div className="template-admin-actions">
+              <button
+                type="button"
+                className="secondary"
+                disabled={publishingAction !== '' || loadingPublication}
+                onClick={() => handleTemplatePublication('publish')}
+              >
+                {publishingAction === 'publish' ? 'Publicant...' : 'Publicar versió'}
+              </button>
+              <button
+                type="button"
+                className="tertiary"
+                disabled={publishingAction !== '' || loadingPublication}
+                onClick={() => handleTemplatePublication('rollback')}
+              >
+                {publishingAction === 'rollback' ? 'Fent rollback...' : 'Fer rollback'}
+              </button>
+            </div>
+            <FieldError error={errors.publication} />
+            <StatusMessage message={publicationMessage} />
           </section>
 
           <section className="form-section">
@@ -266,6 +361,14 @@ function SummaryItem({ label, value }) {
       <strong>{value}</strong>
     </div>
   )
+}
+
+function StatusMessage({ message }) {
+  if (!message) {
+    return null
+  }
+
+  return <p className="status-message">{message}</p>
 }
 
 function formatEuro(amount) {

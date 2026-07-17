@@ -81,6 +81,35 @@ small {
   font-size: 1.25rem;
 }
 
+.section-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-heading-row h2 {
+  margin-bottom: 0;
+}
+
+.published-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f5f9ef;
+  color: #17464c;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.section-copy {
+  margin: 0 0 16px;
+  color: #5c6c67;
+  line-height: 1.5;
+}
+
 label {
   display: block;
   margin-bottom: 16px;
@@ -106,6 +135,12 @@ input {
   display: flex;
   gap: 12px;
   margin-top: 28px;
+}
+
+.template-admin-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 button {
@@ -148,6 +183,12 @@ button:disabled {
   color: #5c6c67;
   font-size: 0.9rem;
   font-weight: 400;
+}
+
+.status-message {
+  margin: 12px 0 0;
+  color: #17464c;
+  font-weight: 600;
 }
 
 .placeholder {
@@ -212,5 +253,11 @@ button:disabled {
 
   .actions {
     flex-direction: column;
+  }
+
+  .section-heading-row,
+  .template-admin-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

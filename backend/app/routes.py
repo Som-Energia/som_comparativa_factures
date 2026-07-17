@@ -4,7 +4,13 @@ from io import BytesIO
 
 from flask import Blueprint, Response, jsonify, request, send_file
 
-from .config import TemplateResolutionError, TemplateValidationError
+from .config import (
+    TemplateResolutionError,
+    TemplateValidationError,
+    get_published_comparison_template_version,
+    publish_comparison_template_version,
+    rollback_comparison_template_version,
+)
 from .services.calculator import ComparisonInputError, build_comparison_report
 from .services.reporting import render_report_html, render_report_pdf
 
@@ -87,6 +93,26 @@ def comparison_report_preview():
     return Response(html, mimetype="text/html")
 
 
+@api.get("/templates/comparison/publication")
+def comparison_template_publication_status():
+    try:
+        published_version = get_published_comparison_template_version()
+    except TemplateResolutionError as exc:
+        return jsonify({"errors": {"publication": str(exc)}}), 404
+
+    return jsonify({"published_version": published_version})
+
+
+@api.post("/templates/comparison/publish")
+def comparison_template_publish():
+    return _update_template_publication(action="publish")
+
+
+@api.post("/templates/comparison/rollback")
+def comparison_template_rollback():
+    return _update_template_publication(action="rollback")
+
+
 def _extract_template_version(source) -> str | None | Response:
     template_version_raw = source.get("template_version")
     if template_version_raw is None:
@@ -99,3 +125,27 @@ def _extract_template_version(source) -> str | None | Response:
         return response
 
     return template_version
+
+
+def _update_template_publication(*, action: str):
+    payload = request.get_json(silent=True) or {}
+    template_version = _extract_template_version(payload)
+    if isinstance(template_version, Response):
+        return template_version
+
+    if template_version is None:
+        return jsonify({"errors": {"template_version": "Cal indicar una versio de plantilla."}}), 400
+
+    try:
+        if action == "publish":
+            bundle = publish_comparison_template_version(template_version)
+            message = f"La versio {bundle.version} s'ha publicat correctament."
+        else:
+            bundle = rollback_comparison_template_version(template_version)
+            message = f"S'ha fet rollback a la versio {bundle.version}."
+    except TemplateValidationError as exc:
+        return jsonify({"errors": {"template_version": str(exc)}}), 422
+    except TemplateResolutionError as exc:
+        return jsonify({"errors": {"template_version": str(exc)}}), 404
+
+    return jsonify({"published_version": bundle.version, "message": message})
