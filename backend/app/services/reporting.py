@@ -19,6 +19,10 @@ def render_report_pdf(report: dict, template_version: str | None = None) -> byte
 
 def render_report_html(report: dict, template_version: str | None = None) -> str:
     template_bundle = resolve_comparison_template_bundle(version=template_version)
+    return render_report_html_for_bundle(report, template_bundle)
+
+
+def render_report_html_for_bundle(report: dict, template_bundle) -> str:
     return _render_report_html(report, template_bundle, asset_mode="html")
 
 
