@@ -4,26 +4,37 @@
     <meta charset="utf-8">
     <style>
       @page {
-        margin: 22mm 18mm;
-        size: A4;
+        margin: {{ theme.page.margin_mm.top }}mm {{ theme.page.margin_mm.right }}mm {{ theme.page.margin_mm.bottom }}mm {{ theme.page.margin_mm.left }}mm;
+        size: {{ theme.page.size }};
       }
 
       :root {
-        --bg: #eef1e8;
-        --ink: #1c2d2c;
-        --muted: #66716d;
-        --brand: #17464c;
-        --accent: #d3f85c;
-        --soft: #b8b3ea;
-        --line: #d7ded3;
+        --bg: {{ theme.colors.background }};
+        --ink: {{ theme.colors.ink }};
+        --muted: {{ theme.colors.muted }};
+        --brand: {{ theme.colors.brand }};
+        --accent: {{ theme.colors.accent }};
+        --soft: {{ theme.colors.soft }};
+        --line: {{ theme.colors.line }};
+        --surface: {{ theme.colors.surface }};
+        --inverse-text: {{ theme.colors.inverse_text }};
+        --font-family: {{ theme.typography.font_family }};
+        --body-size: {{ theme.typography.body_size_px }}px;
+        --h1-size: {{ theme.typography.h1_size_px }}px;
+        --h2-size: {{ theme.typography.h2_size_px }}px;
+        --h3-size: {{ theme.typography.h3_size_px }}px;
+        --card-radius: {{ theme.shape.card_radius_px }}px;
+        --badge-radius: {{ theme.shape.badge_radius_px }}px;
+        --card-padding: {{ theme.spacing.card_padding_px }}px;
+        --table-cell: {{ theme.spacing.table_cell_px }}px;
       }
 
       body {
         margin: 0;
-        font-family: Arial, sans-serif;
+        font-family: var(--font-family);
         background: var(--bg);
         color: var(--ink);
-        font-size: 12px;
+        font-size: var(--body-size);
       }
 
       .page {
@@ -35,7 +46,7 @@
       }
 
       .hero h1 {
-        font-size: 28px;
+        font-size: var(--h1-size);
         margin: 0 0 16px;
       }
 
@@ -46,20 +57,20 @@
 
       .badge {
         display: inline-block;
-        padding: 10px 14px;
-        border-radius: 999px;
+        padding: var(--table-cell) 14px;
+        border-radius: var(--badge-radius);
         background: var(--accent);
         font-weight: bold;
         margin-top: 18px;
       }
 
       h2 {
-        font-size: 24px;
+        font-size: var(--h2-size);
         margin: 0 0 16px;
       }
 
       h3 {
-        font-size: 18px;
+        font-size: var(--h3-size);
         margin: 24px 0 12px;
       }
 
@@ -70,13 +81,13 @@
 
       .summary-table th {
         background: var(--soft);
-        padding: 10px;
+        padding: var(--table-cell);
         text-align: center;
       }
 
       .summary-table td {
-        background: #ffffff;
-        padding: 12px;
+        background: var(--surface);
+        padding: calc(var(--table-cell) + 2px);
         text-align: center;
         font-size: 18px;
       }
@@ -89,10 +100,10 @@
       }
 
       .card {
-        background: #ffffff;
-        padding: 16px;
+        background: var(--surface);
+        padding: var(--card-padding);
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: var(--card-radius);
       }
 
       .meta-row {
@@ -105,7 +116,7 @@
       }
 
       .detail-table td {
-        padding: 10px 8px;
+        padding: var(--table-cell) 8px;
         border-bottom: 1px solid var(--line);
       }
 
@@ -115,7 +126,7 @@
 
       .detail-table .total td {
         background: var(--brand);
-        color: #ffffff;
+        color: var(--inverse-text);
         font-weight: bold;
       }
 
@@ -126,7 +137,7 @@
 
       .energy-table th,
       .energy-table td {
-        padding: 8px;
+        padding: calc(var(--table-cell) - 2px);
         border: 1px solid var(--line);
       }
 
@@ -141,10 +152,10 @@
       .cta-link {
         display: inline-block;
         margin-top: 18px;
-        padding: 10px 16px;
-        border-radius: 999px;
+        padding: var(--table-cell) 16px;
+        border-radius: var(--badge-radius);
         background: var(--brand);
-        color: #ffffff;
+        color: var(--inverse-text);
         font-weight: bold;
         text-decoration: none;
       }
