@@ -7,6 +7,7 @@ const initialForm = {
   titular: '',
   billing_days: '',
   competitor_invoice_amount: '',
+  template_version: '',
   energy_by_periods: {
     P1: '',
     P2: '',
@@ -36,7 +37,7 @@ function App() {
   }
 
   function buildPayload() {
-    return {
+    const payload = {
       cups: form.cups,
       titular: form.titular,
       billing_days: Number(form.billing_days),
@@ -47,6 +48,13 @@ function App() {
         P3: Number(form.energy_by_periods.P3),
       },
     }
+
+    const templateVersion = form.template_version.trim()
+    if (templateVersion) {
+      payload.template_version = templateVersion
+    }
+
+    return payload
   }
 
   async function handlePreview(event) {
@@ -99,6 +107,17 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  function handleOpenHtmlPreview() {
+    const templateVersion = form.template_version.trim()
+    const previewUrl = new URL(`${apiBaseUrl}/reports/comparison.preview`)
+
+    if (templateVersion) {
+      previewUrl.searchParams.set('template_version', templateVersion)
+    }
+
+    window.open(previewUrl.toString(), '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <main className="page-shell">
       <section className="hero-card">
@@ -148,6 +167,18 @@ function App() {
               />
               <FieldError error={errors.competitor_invoice_amount} />
             </label>
+            <label>
+              Versio de plantilla (opcional)
+              <input
+                value={form.template_version}
+                onChange={(event) => updateField('template_version', event.target.value)}
+                placeholder="v1"
+              />
+              <small className="field-help">
+                Si el deixeu buit, es fara servir la versio publicada. El preview HTML usa dades de mostra representatives.
+              </small>
+              <FieldError error={errors.template_version} />
+            </label>
           </section>
 
           <section className="form-section">
@@ -175,6 +206,9 @@ function App() {
             </button>
             <button type="button" className="secondary" disabled={!preview || downloading} onClick={handleDownload}>
               {downloading ? 'Generant PDF...' : 'Descarregar PDF'}
+            </button>
+            <button type="button" className="tertiary" onClick={handleOpenHtmlPreview}>
+              Obrir preview HTML
             </button>
           </div>
         </form>

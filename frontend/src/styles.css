@@ -15,7 +15,8 @@ body {
 }
 
 button,
-input {
+input,
+small {
   font: inherit;
 }
 
@@ -122,6 +123,12 @@ button.secondary {
   color: #1c2d2c;
 }
 
+button.tertiary {
+  background: #ffffff;
+  color: #17464c;
+  border: 1px solid #cbd7cc;
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -133,6 +140,14 @@ button:disabled {
   color: #b32944;
   font-size: 0.9rem;
   font-weight: 500;
+}
+
+.field-help {
+  display: block;
+  margin-top: 8px;
+  color: #5c6c67;
+  font-size: 0.9rem;
+  font-weight: 400;
 }
 
 .placeholder {
