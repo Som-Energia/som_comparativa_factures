@@ -69,6 +69,9 @@ La renderitzacio continua controlada pel backend; aquests YAML nomes declaren da
 | `cta.body` | list[string] | si | 1-2 items, cada item 1-320 caracters |
 | `cta.services_title` | string | si | 1-60 caracters |
 | `cta.services` | list[string] | si | 1-6 items, cada item 1-120 caracters |
+| `cta.primary_action` | object\|null | si | `null` o CTA primaria controlada |
+| `cta.primary_action.label` | string | si si hi ha CTA | 1-40 caracters |
+| `cta.primary_action.url` | string | si si hi ha CTA | URL absoluta `https://`, 1-200 caracters |
 
 ### Contracte de `theme.yaml`
 

@@ -4,7 +4,7 @@ from io import BytesIO
 
 from flask import Blueprint, jsonify, request, send_file
 
-from .config import TemplateResolutionError
+from .config import TemplateResolutionError, TemplateValidationError
 from .services.calculator import ComparisonInputError, build_comparison_report
 from .services.reporting import render_report_pdf
 
@@ -47,6 +47,8 @@ def comparison_report_pdf():
 
     try:
         pdf_bytes = render_report_pdf(report, template_version=template_version)
+    except TemplateValidationError as exc:
+        return jsonify({"errors": {"template_version": str(exc)}}), 422
     except TemplateResolutionError as exc:
         return jsonify({"errors": {"template_version": str(exc)}}), 404
 
