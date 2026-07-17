@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 import re
+import tempfile
 from typing import Any
 from urllib.parse import urlparse
 
@@ -50,6 +52,7 @@ FORBIDDEN_TEXT_FRAGMENTS = ("{{", "{%", "}}", "</", "<", ">")
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 ALLOWED_ASSET_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg"}
 MAX_ASSET_SIZE_BYTES = 2 * 1024 * 1024
+TEMPLATE_VERSION_PATTERN = re.compile(r"^v([1-9][0-9]*)$")
 
 
 @lru_cache(maxsize=1)
@@ -62,9 +65,25 @@ def resolve_comparison_template_bundle(version: str | None = None) -> TemplateBu
     return _resolve_template_bundle("comparison", version=version)
 
 
+def get_published_comparison_template_version() -> str:
+    return _load_published_template_version(PDF_TEMPLATES_DIR / "comparison")
+
+
+def publish_comparison_template_version(version: str) -> TemplateBundle:
+    template_dir = PDF_TEMPLATES_DIR / "comparison"
+    bundle = _resolve_template_bundle("comparison", version=version)
+    _write_published_template_version(template_dir, bundle.version)
+    return bundle
+
+
+def rollback_comparison_template_version(version: str) -> TemplateBundle:
+    return publish_comparison_template_version(version)
+
+
 def _resolve_template_bundle(template_id: str, version: str | None = None) -> TemplateBundle:
     template_dir = PDF_TEMPLATES_DIR / template_id
     resolved_version = version or _load_published_template_version(template_dir)
+    version_number = _extract_template_version_number(resolved_version)
     version_dir = template_dir / "versions" / resolved_version
 
     if not version_dir.is_dir():
@@ -90,9 +109,9 @@ def _resolve_template_bundle(template_id: str, version: str | None = None) -> Te
     theme = _load_yaml_file(bundle.theme_path)
     assets_manifest = _load_yaml_file(bundle.assets_manifest_path)
 
-    _validate_content_template(content)
-    _validate_theme_template(theme)
-    assets = _resolve_assets_manifest(assets_manifest, bundle.assets_dir)
+    _validate_content_template(content, version_number)
+    _validate_theme_template(theme, version_number)
+    assets = _resolve_assets_manifest(assets_manifest, bundle.assets_dir, version_number)
 
     bundle = TemplateBundle(
         template_id=template_id,
@@ -116,20 +135,66 @@ def _load_published_template_version(template_dir: Path) -> str:
             f"Falta el fitxer de publicacio del template '{template_dir.name}'."
         )
 
-    with published_path.open("r", encoding="utf-8") as handle:
-        payload = json.load(handle)
-
-    version = str(payload.get("current_version", "")).strip()
-    if not version:
+    try:
+        with published_path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except json.JSONDecodeError as exc:
         raise TemplateResolutionError(
-            f"El fitxer de publicacio del template '{template_dir.name}' no defineix 'current_version'."
+            f"El fitxer de publicacio del template '{template_dir.name}' no es un JSON valid."
+        ) from exc
+
+    if not isinstance(payload, dict) or set(payload) != {"current_version"}:
+        raise TemplateResolutionError(
+            f"El fitxer de publicacio del template '{template_dir.name}' ha de contenir nomes 'current_version'."
         )
-    return version
+
+    version = payload["current_version"]
+    if not isinstance(version, str):
+        raise TemplateResolutionError(
+            f"El fitxer de publicacio del template '{template_dir.name}' ha de definir 'current_version' com a text."
+        )
+    return _parse_template_version(version)
+
+
+def _write_published_template_version(template_dir: Path, version: str) -> None:
+    published_path = template_dir / "published.json"
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=template_dir,
+        prefix=".published-",
+        suffix=".json",
+        delete=False,
+    ) as handle:
+        json.dump({"current_version": version}, handle, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+        temporary_path = Path(handle.name)
+
+    try:
+        os.replace(temporary_path, published_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _parse_template_version(version: str) -> str:
+    normalized_version = version.strip()
+    if not TEMPLATE_VERSION_PATTERN.fullmatch(normalized_version):
+        raise TemplateResolutionError("La versio de template ha de tenir el format 'v' seguit d'un enter positiu.")
+    return normalized_version
+
+
+def _extract_template_version_number(version: str) -> int:
+    normalized_version = _parse_template_version(version)
+    match = TEMPLATE_VERSION_PATTERN.fullmatch(normalized_version)
+    assert match is not None
+    return int(match.group(1))
 
 
 def _validate_template_bundle(bundle: TemplateBundle) -> None:
     missing_files = [
-        str(path.relative_to(Path(__file__).resolve().parents[1]))
+        _describe_path(path)
         for path in (bundle.content_path, bundle.theme_path, bundle.assets_manifest_path)
         if not path.is_file()
     ]
@@ -139,7 +204,7 @@ def _validate_template_bundle(bundle: TemplateBundle) -> None:
         )
 
     if not bundle.assets_dir.is_dir():
-        assets_path = bundle.assets_dir.relative_to(Path(__file__).resolve().parents[1])
+        assets_path = _describe_path(bundle.assets_dir)
         raise TemplateResolutionError(
             f"La versio '{bundle.version}' del template '{bundle.template_id}' no te directori d'assets: {assets_path}."
         )
@@ -158,13 +223,13 @@ def _load_yaml_file(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _validate_content_template(content: dict[str, Any]) -> None:
+def _validate_content_template(content: dict[str, Any], expected_version: int) -> None:
     _validate_exact_keys(content, "content", required={"meta", "hero", "summary", "invoice_card", "energy_table", "breakdown", "legal", "cta"})
 
     meta = _expect_dict(content["meta"], "content.meta")
     _validate_exact_keys(meta, "content.meta", required={"template_id", "template_version", "locale"})
     _validate_fixed_string(meta["template_id"], "content.meta.template_id", "comparison")
-    _validate_integer(meta["template_version"], "content.meta.template_version", exact=1)
+    _validate_integer(meta["template_version"], "content.meta.template_version", exact=expected_version)
     _validate_fixed_string(meta["locale"], "content.meta.locale", "ca")
 
     hero = _expect_dict(content["hero"], "content.hero")
@@ -218,13 +283,13 @@ def _validate_content_template(content: dict[str, Any]) -> None:
     _validate_cta_action(cta["primary_action"], "content.cta.primary_action")
 
 
-def _validate_theme_template(theme: dict[str, Any]) -> None:
+def _validate_theme_template(theme: dict[str, Any], expected_version: int) -> None:
     _validate_exact_keys(theme, "theme", required={"meta", "page", "colors", "typography", "shape", "spacing"})
 
     meta = _expect_dict(theme["meta"], "theme.meta")
     _validate_exact_keys(meta, "theme.meta", required={"template_id", "template_version"})
     _validate_fixed_string(meta["template_id"], "theme.meta.template_id", "comparison")
-    _validate_integer(meta["template_version"], "theme.meta.template_version", exact=1)
+    _validate_integer(meta["template_version"], "theme.meta.template_version", exact=expected_version)
 
     page = _expect_dict(theme["page"], "theme.page")
     _validate_exact_keys(page, "theme.page", required={"size", "margin_mm"})
@@ -258,13 +323,13 @@ def _validate_theme_template(theme: dict[str, Any]) -> None:
     _validate_integer(spacing["table_cell_px"], "theme.spacing.table_cell_px", min_value=6, max_value=16)
 
 
-def _validate_assets_template(assets_payload: dict[str, Any], assets_dir: Path) -> None:
+def _validate_assets_template(assets_payload: dict[str, Any], assets_dir: Path, expected_version: int) -> None:
     _validate_exact_keys(assets_payload, "assets", required={"meta", "registry", "slots"})
 
     meta = _expect_dict(assets_payload["meta"], "assets.meta")
     _validate_exact_keys(meta, "assets.meta", required={"template_id", "template_version"})
     _validate_fixed_string(meta["template_id"], "assets.meta.template_id", "comparison")
-    _validate_integer(meta["template_version"], "assets.meta.template_version", exact=1)
+    _validate_integer(meta["template_version"], "assets.meta.template_version", exact=expected_version)
 
     registry = _expect_dict(assets_payload["registry"], "assets.registry")
     for asset_id, entry in registry.items():
@@ -282,8 +347,8 @@ def _validate_assets_template(assets_payload: dict[str, Any], assets_dir: Path) 
     _validate_asset_slot(slots["hero_illustration"], "assets.slots.hero_illustration", registry)
 
 
-def _resolve_assets_manifest(assets_payload: dict[str, Any], assets_dir: Path) -> dict[str, Any]:
-    _validate_assets_template(assets_payload, assets_dir)
+def _resolve_assets_manifest(assets_payload: dict[str, Any], assets_dir: Path, expected_version: int) -> dict[str, Any]:
+    _validate_assets_template(assets_payload, assets_dir, expected_version)
 
     registry = assets_payload["registry"]
     slots = assets_payload["slots"]
@@ -463,3 +528,11 @@ def _validate_https_url(value: Any, path: str, *, min_length: int, max_length: i
     parsed = urlparse(url)
     if parsed.scheme != "https" or not parsed.netloc:
         raise TemplateValidationError(f"{path} ha de ser una URL absoluta amb https.")
+
+
+def _describe_path(path: Path) -> str:
+    backend_root = Path(__file__).resolve().parents[1]
+    try:
+        return str(path.relative_to(backend_root))
+    except ValueError:
+        return str(path)
