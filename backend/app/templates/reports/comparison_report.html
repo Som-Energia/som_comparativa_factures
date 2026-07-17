@@ -55,6 +55,27 @@
         line-height: 1.5;
       }
 
+      .hero-media {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .hero-copy {
+        flex: 1;
+      }
+
+      .hero-logo {
+        display: block;
+        margin-left: auto;
+      }
+
+      .hero-illustration {
+        display: block;
+        margin-top: 18px;
+      }
+
       .badge {
         display: inline-block;
         padding: var(--table-cell) 14px;
@@ -163,15 +184,37 @@
   </head>
   <body>
     <section class="page hero">
-      <h1>{{ content.hero.title }}</h1>
-      {% for paragraph in content.hero.intro %}
-      <p>{{ paragraph }}</p>
-      {% endfor %}
-      <p>
-        {{ content.hero.customer_labels.titular }}: <strong>{{ report.customer.titular }}</strong><br>
-        {{ content.hero.customer_labels.cups }}: <strong>{{ report.customer.cups }}</strong>
-      </p>
-      <div class="badge">{{ content.hero.badge_text }}</div>
+      <div class="hero-media">
+        <div class="hero-copy">
+          <h1>{{ content.hero.title }}</h1>
+          {% for paragraph in content.hero.intro %}
+          <p>{{ paragraph }}</p>
+          {% endfor %}
+          <p>
+            {{ content.hero.customer_labels.titular }}: <strong>{{ report.customer.titular }}</strong><br>
+            {{ content.hero.customer_labels.cups }}: <strong>{{ report.customer.cups }}</strong>
+          </p>
+          <div class="badge">{{ content.hero.badge_text }}</div>
+        </div>
+
+        {% if assets.logo %}
+        <img
+          class="hero-logo"
+          src="{{ assets.logo.src }}"
+          alt="{{ assets.logo.alt }}"
+          width="{{ assets.logo.max_width_px }}"
+        >
+        {% endif %}
+      </div>
+
+      {% if assets.hero_illustration %}
+      <img
+        class="hero-illustration"
+        src="{{ assets.hero_illustration.src }}"
+        alt="{{ assets.hero_illustration.alt }}"
+        width="{{ assets.hero_illustration.max_width_px }}"
+      >
+      {% endif %}
     </section>
 
     <section class="page section">

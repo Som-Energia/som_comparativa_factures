@@ -13,11 +13,12 @@ def render_report_pdf(report: dict, template_version: str | None = None) -> byte
         "reports/comparison_report.html",
         report=report,
         content=content,
+        assets=template_bundle.assets,
         theme=template_bundle.theme,
         euro=euro,
         template_bundle=template_bundle,
     )
-    return HTML(string=html).write_pdf()
+    return HTML(string=html, base_url=template_bundle.assets_dir.as_uri()).write_pdf()
 
 
 def euro(amount: float) -> str:
