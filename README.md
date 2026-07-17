@@ -38,6 +38,7 @@ Endpoints:
 
 - `POST /api/compare`: retorna resum JSON validat.
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
+- `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
 - `GET /api/health`: healthcheck.
 
 ## Frontend
