@@ -137,30 +137,40 @@
       ul {
         padding-left: 18px;
       }
+
+      .cta-link {
+        display: inline-block;
+        margin-top: 18px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: var(--brand);
+        color: #ffffff;
+        font-weight: bold;
+        text-decoration: none;
+      }
     </style>
   </head>
   <body>
     <section class="page hero">
-      <h1>Simulacio de factura Som Energia</h1>
+      <h1>{{ content.hero.title }}</h1>
+      {% for paragraph in content.hero.intro %}
+      <p>{{ paragraph }}</p>
+      {% endfor %}
       <p>
-        Aquest informe compara l'import actual de la factura amb el cost estimat segons la tarifa
-        configurada de Som Energia. El calcul es genera exclusivament amb les dades entrades al formulari.
+        {{ content.hero.customer_labels.titular }}: <strong>{{ report.customer.titular }}</strong><br>
+        {{ content.hero.customer_labels.cups }}: <strong>{{ report.customer.cups }}</strong>
       </p>
-      <p>
-        Titular: <strong>{{ report.customer.titular }}</strong><br>
-        CUPS: <strong>{{ report.customer.cups }}</strong>
-      </p>
-      <div class="badge">Tarifa {{ report.pricing.tariff_name }} · Vigent des de {{ report.pricing.effective_date }}</div>
+      <div class="badge">{{ content.hero.badge_text }}</div>
     </section>
 
     <section class="page section">
-      <h2>Simulacio de cost de la factura</h2>
+      <h2>{{ content.summary.title }}</h2>
       <table class="summary-table">
         <thead>
           <tr>
-            <th>Cost actual</th>
-            <th>Cost amb Som Energia</th>
-            <th>{{ report.comparison.savings_label }}</th>
+            <th>{{ content.summary.columns.current_cost }}</th>
+            <th>{{ content.summary.columns.som_cost }}</th>
+            <th>{% if report.comparison.savings >= 0 %}{{ content.summary.columns.savings_positive }}{% else %}{{ content.summary.columns.savings_negative }}{% endif %}</th>
           </tr>
         </thead>
         <tbody>
@@ -174,21 +184,21 @@
 
       <div class="detail-grid">
         <div class="card">
-          <h3>Dades de la factura</h3>
-          <div class="meta-row"><strong>Titular:</strong> {{ report.customer.titular }}</div>
-          <div class="meta-row"><strong>CUPS:</strong> {{ report.customer.cups }}</div>
-          <div class="meta-row"><strong>Dies:</strong> {{ report.input.billing_days }}</div>
+          <h3>{{ content.invoice_card.title }}</h3>
+          <div class="meta-row"><strong>{{ content.invoice_card.labels.titular }}:</strong> {{ report.customer.titular }}</div>
+          <div class="meta-row"><strong>{{ content.invoice_card.labels.cups }}:</strong> {{ report.customer.cups }}</div>
+          <div class="meta-row"><strong>{{ content.invoice_card.labels.billing_days }}:</strong> {{ report.input.billing_days }}</div>
         </div>
 
         <div class="card">
-          <h3>Energia per periodes</h3>
+          <h3>{{ content.energy_table.title }}</h3>
           <table class="energy-table">
             <thead>
               <tr>
-                <th>Periode</th>
-                <th>kWh</th>
-                <th>Preu</th>
-                <th>Import</th>
+                <th>{{ content.energy_table.columns.period }}</th>
+                <th>{{ content.energy_table.columns.kwh }}</th>
+                <th>{{ content.energy_table.columns.unit_price }}</th>
+                <th>{{ content.energy_table.columns.amount }}</th>
               </tr>
             </thead>
             <tbody>
@@ -205,7 +215,7 @@
         </div>
       </div>
 
-      <h3>Detall del calcul</h3>
+      <h3>{{ content.breakdown.title }}</h3>
       <table class="detail-table">
         <tbody>
           {% for item in report.breakdown.totals %}
@@ -218,22 +228,26 @@
       </table>
 
       <p class="muted">
-        Aquesta simulacio nomes es valida per aquestes dades d'entrada. No s'ha d'extrapolar automaticament a altres factures.
+        {{ content.legal.disclaimer }}
       </p>
     </section>
 
     <section class="page">
-      <h2>Com et pots unir a Som Energia?</h2>
-      <p>
-        Aquest MVP deixa el bloc comercial en plantilla HTML per facilitar canvis de copy, imatges i CTA sense tocar el motor de calcul.
-      </p>
+      <h2>{{ content.cta.title }}</h2>
+      {% for paragraph in content.cta.body %}
+      <p>{{ paragraph }}</p>
+      {% endfor %}
 
-      <h3>Serveis inclosos</h3>
+      <h3>{{ content.cta.services_title }}</h3>
       <ul>
-        <li>Electricitat 100% renovable certificada.</li>
-        <li>Comparativa transparent basada en preus de configuracio.</li>
-        <li>Plantilla PDF desacoblada del calcul per poder iterar el disseny.</li>
+        {% for item in content.cta.services %}
+        <li>{{ item }}</li>
+        {% endfor %}
       </ul>
+
+      {% if content.cta.primary_action %}
+      <a class="cta-link" href="{{ content.cta.primary_action.url }}">{{ content.cta.primary_action.label }}</a>
+      {% endif %}
     </section>
   </body>
   </html>
