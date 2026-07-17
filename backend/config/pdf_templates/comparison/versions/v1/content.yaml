@@ -1,0 +1,54 @@
+meta:
+  template_id: comparison
+  template_version: 1
+  locale: ca
+
+hero:
+  title: Simulacio de factura Som Energia
+  intro:
+    - Aquest informe compara l'import actual de la factura amb el cost estimat segons la tarifa configurada de Som Energia.
+    - El calcul es genera exclusivament amb les dades entrades al formulari.
+  customer_labels:
+    titular: Titular
+    cups: CUPS
+  badge_text: Tarifa {pricing.tariff_name} · Vigent des de {pricing.effective_date}
+
+summary:
+  title: Simulacio de cost de la factura
+  columns:
+    current_cost: Cost actual
+    som_cost: Cost amb Som Energia
+    savings_positive: Estalvi
+    savings_negative: Diferencia
+
+invoice_card:
+  title: Dades de la factura
+  labels:
+    titular: Titular
+    cups: CUPS
+    billing_days: Dies
+
+energy_table:
+  title: Energia per periodes
+  columns:
+    period: Periode
+    kwh: kWh
+    unit_price: Preu
+    amount: Import
+
+breakdown:
+  title: Detall del calcul
+
+legal:
+  disclaimer: Aquesta simulacio nomes es valida per aquestes dades d'entrada. No s'ha d'extrapolar automaticament a altres factures.
+
+cta:
+  title: Com et pots unir a Som Energia?
+  body:
+    - Aquest MVP deixa el bloc comercial en plantilla HTML per facilitar canvis de copy, imatges i CTA sense tocar el motor de calcul.
+  services_title: Serveis inclosos
+  services:
+    - Electricitat 100% renovable certificada.
+    - Comparativa transparent basada en preus de configuracio.
+    - Plantilla PDF desacoblada del calcul per poder iterar el disseny.
+  primary_action: null

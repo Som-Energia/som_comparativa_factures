@@ -1,8 +1,10 @@
 __pycache__/
 *.py[cod]
+.python-version
 
 .venv/
 backend/.venv/
+backend/.python-version
 
 frontend/node_modules/
 frontend/dist/

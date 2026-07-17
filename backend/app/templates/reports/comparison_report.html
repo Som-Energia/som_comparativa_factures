@@ -4,26 +4,37 @@
     <meta charset="utf-8">
     <style>
       @page {
-        margin: 22mm 18mm;
-        size: A4;
+        margin: {{ theme.page.margin_mm.top }}mm {{ theme.page.margin_mm.right }}mm {{ theme.page.margin_mm.bottom }}mm {{ theme.page.margin_mm.left }}mm;
+        size: {{ theme.page.size }};
       }
 
       :root {
-        --bg: #eef1e8;
-        --ink: #1c2d2c;
-        --muted: #66716d;
-        --brand: #17464c;
-        --accent: #d3f85c;
-        --soft: #b8b3ea;
-        --line: #d7ded3;
+        --bg: {{ theme.colors.background }};
+        --ink: {{ theme.colors.ink }};
+        --muted: {{ theme.colors.muted }};
+        --brand: {{ theme.colors.brand }};
+        --accent: {{ theme.colors.accent }};
+        --soft: {{ theme.colors.soft }};
+        --line: {{ theme.colors.line }};
+        --surface: {{ theme.colors.surface }};
+        --inverse-text: {{ theme.colors.inverse_text }};
+        --font-family: {{ theme.typography.font_family }};
+        --body-size: {{ theme.typography.body_size_px }}px;
+        --h1-size: {{ theme.typography.h1_size_px }}px;
+        --h2-size: {{ theme.typography.h2_size_px }}px;
+        --h3-size: {{ theme.typography.h3_size_px }}px;
+        --card-radius: {{ theme.shape.card_radius_px }}px;
+        --badge-radius: {{ theme.shape.badge_radius_px }}px;
+        --card-padding: {{ theme.spacing.card_padding_px }}px;
+        --table-cell: {{ theme.spacing.table_cell_px }}px;
       }
 
       body {
         margin: 0;
-        font-family: Arial, sans-serif;
+        font-family: var(--font-family);
         background: var(--bg);
         color: var(--ink);
-        font-size: 12px;
+        font-size: var(--body-size);
       }
 
       .page {
@@ -35,7 +46,7 @@
       }
 
       .hero h1 {
-        font-size: 28px;
+        font-size: var(--h1-size);
         margin: 0 0 16px;
       }
 
@@ -44,22 +55,43 @@
         line-height: 1.5;
       }
 
+      .hero-media {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .hero-copy {
+        flex: 1;
+      }
+
+      .hero-logo {
+        display: block;
+        margin-left: auto;
+      }
+
+      .hero-illustration {
+        display: block;
+        margin-top: 18px;
+      }
+
       .badge {
         display: inline-block;
-        padding: 10px 14px;
-        border-radius: 999px;
+        padding: var(--table-cell) 14px;
+        border-radius: var(--badge-radius);
         background: var(--accent);
         font-weight: bold;
         margin-top: 18px;
       }
 
       h2 {
-        font-size: 24px;
+        font-size: var(--h2-size);
         margin: 0 0 16px;
       }
 
       h3 {
-        font-size: 18px;
+        font-size: var(--h3-size);
         margin: 24px 0 12px;
       }
 
@@ -70,13 +102,13 @@
 
       .summary-table th {
         background: var(--soft);
-        padding: 10px;
+        padding: var(--table-cell);
         text-align: center;
       }
 
       .summary-table td {
-        background: #ffffff;
-        padding: 12px;
+        background: var(--surface);
+        padding: calc(var(--table-cell) + 2px);
         text-align: center;
         font-size: 18px;
       }
@@ -89,10 +121,10 @@
       }
 
       .card {
-        background: #ffffff;
-        padding: 16px;
+        background: var(--surface);
+        padding: var(--card-padding);
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: var(--card-radius);
       }
 
       .meta-row {
@@ -105,7 +137,7 @@
       }
 
       .detail-table td {
-        padding: 10px 8px;
+        padding: var(--table-cell) 8px;
         border-bottom: 1px solid var(--line);
       }
 
@@ -115,7 +147,7 @@
 
       .detail-table .total td {
         background: var(--brand);
-        color: #ffffff;
+        color: var(--inverse-text);
         font-weight: bold;
       }
 
@@ -126,7 +158,7 @@
 
       .energy-table th,
       .energy-table td {
-        padding: 8px;
+        padding: calc(var(--table-cell) - 2px);
         border: 1px solid var(--line);
       }
 
@@ -137,30 +169,62 @@
       ul {
         padding-left: 18px;
       }
+
+      .cta-link {
+        display: inline-block;
+        margin-top: 18px;
+        padding: var(--table-cell) 16px;
+        border-radius: var(--badge-radius);
+        background: var(--brand);
+        color: var(--inverse-text);
+        font-weight: bold;
+        text-decoration: none;
+      }
     </style>
   </head>
   <body>
     <section class="page hero">
-      <h1>Simulacio de factura Som Energia</h1>
-      <p>
-        Aquest informe compara l'import actual de la factura amb el cost estimat segons la tarifa
-        configurada de Som Energia. El calcul es genera exclusivament amb les dades entrades al formulari.
-      </p>
-      <p>
-        Titular: <strong>{{ report.customer.titular }}</strong><br>
-        CUPS: <strong>{{ report.customer.cups }}</strong>
-      </p>
-      <div class="badge">Tarifa {{ report.pricing.tariff_name }} · Vigent des de {{ report.pricing.effective_date }}</div>
+      <div class="hero-media">
+        <div class="hero-copy">
+          <h1>{{ content.hero.title }}</h1>
+          {% for paragraph in content.hero.intro %}
+          <p>{{ paragraph }}</p>
+          {% endfor %}
+          <p>
+            {{ content.hero.customer_labels.titular }}: <strong>{{ report.customer.titular }}</strong><br>
+            {{ content.hero.customer_labels.cups }}: <strong>{{ report.customer.cups }}</strong>
+          </p>
+          <div class="badge">{{ content.hero.badge_text }}</div>
+        </div>
+
+        {% if assets.logo %}
+        <img
+          class="hero-logo"
+          src="{{ assets.logo.src }}"
+          alt="{{ assets.logo.alt }}"
+          width="{{ assets.logo.max_width_px }}"
+        >
+        {% endif %}
+      </div>
+
+      {% if assets.hero_illustration %}
+      <img
+        class="hero-illustration"
+        src="{{ assets.hero_illustration.src }}"
+        alt="{{ assets.hero_illustration.alt }}"
+        width="{{ assets.hero_illustration.max_width_px }}"
+      >
+      {% endif %}
     </section>
 
     <section class="page section">
-      <h2>Simulacio de cost de la factura</h2>
+      <h2>{{ content.summary.title }}</h2>
       <table class="summary-table">
         <thead>
           <tr>
-            <th>Cost actual</th>
-            <th>Cost amb Som Energia</th>
-            <th>{{ report.comparison.savings_label }}</th>
+            <th>{{ content.summary.columns.current_cost }}</th>
+            <th>{{ content.summary.columns.som_cost }}</th>
+            <th>{% if report.comparison.savings >= 0 %}{{ content.summary.columns.savings_positive }}{% else %}{{ content.summary.columns.savings_negative }}{% endif %}</th>
           </tr>
         </thead>
         <tbody>
@@ -174,21 +238,21 @@
 
       <div class="detail-grid">
         <div class="card">
-          <h3>Dades de la factura</h3>
-          <div class="meta-row"><strong>Titular:</strong> {{ report.customer.titular }}</div>
-          <div class="meta-row"><strong>CUPS:</strong> {{ report.customer.cups }}</div>
-          <div class="meta-row"><strong>Dies:</strong> {{ report.input.billing_days }}</div>
+          <h3>{{ content.invoice_card.title }}</h3>
+          <div class="meta-row"><strong>{{ content.invoice_card.labels.titular }}:</strong> {{ report.customer.titular }}</div>
+          <div class="meta-row"><strong>{{ content.invoice_card.labels.cups }}:</strong> {{ report.customer.cups }}</div>
+          <div class="meta-row"><strong>{{ content.invoice_card.labels.billing_days }}:</strong> {{ report.input.billing_days }}</div>
         </div>
 
         <div class="card">
-          <h3>Energia per periodes</h3>
+          <h3>{{ content.energy_table.title }}</h3>
           <table class="energy-table">
             <thead>
               <tr>
-                <th>Periode</th>
-                <th>kWh</th>
-                <th>Preu</th>
-                <th>Import</th>
+                <th>{{ content.energy_table.columns.period }}</th>
+                <th>{{ content.energy_table.columns.kwh }}</th>
+                <th>{{ content.energy_table.columns.unit_price }}</th>
+                <th>{{ content.energy_table.columns.amount }}</th>
               </tr>
             </thead>
             <tbody>
@@ -205,7 +269,7 @@
         </div>
       </div>
 
-      <h3>Detall del calcul</h3>
+      <h3>{{ content.breakdown.title }}</h3>
       <table class="detail-table">
         <tbody>
           {% for item in report.breakdown.totals %}
@@ -218,22 +282,26 @@
       </table>
 
       <p class="muted">
-        Aquesta simulacio nomes es valida per aquestes dades d'entrada. No s'ha d'extrapolar automaticament a altres factures.
+        {{ content.legal.disclaimer }}
       </p>
     </section>
 
     <section class="page">
-      <h2>Com et pots unir a Som Energia?</h2>
-      <p>
-        Aquest MVP deixa el bloc comercial en plantilla HTML per facilitar canvis de copy, imatges i CTA sense tocar el motor de calcul.
-      </p>
+      <h2>{{ content.cta.title }}</h2>
+      {% for paragraph in content.cta.body %}
+      <p>{{ paragraph }}</p>
+      {% endfor %}
 
-      <h3>Serveis inclosos</h3>
+      <h3>{{ content.cta.services_title }}</h3>
       <ul>
-        <li>Electricitat 100% renovable certificada.</li>
-        <li>Comparativa transparent basada en preus de configuracio.</li>
-        <li>Plantilla PDF desacoblada del calcul per poder iterar el disseny.</li>
+        {% for item in content.cta.services %}
+        <li>{{ item }}</li>
+        {% endfor %}
       </ul>
+
+      {% if content.cta.primary_action %}
+      <a class="cta-link" href="{{ content.cta.primary_action.url }}">{{ content.cta.primary_action.label }}</a>
+      {% endif %}
     </section>
   </body>
   </html>

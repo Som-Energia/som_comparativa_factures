@@ -7,6 +7,8 @@ MVP per generar una comparativa de factura amb Som Energia a partir d'un formula
 - `frontend/`: React + Vite, formulari d'una sola pantalla i resum previ.
 - `backend/`: Flask API amb validacio, calcul i render HTML a PDF.
 - `backend/config/pricing.json`: configuracio de preus, impostos i literals de tarifa.
+- `backend/config/pdf_templates/comparison/published.json`: punter de la versio activa del template.
+- `backend/config/pdf_templates/comparison/versions/v1/`: contracte editable de `content.yaml`, `theme.yaml` i `assets.yaml`.
 
 ## Contracte minim d'entrada
 
@@ -36,6 +38,7 @@ Endpoints:
 
 - `POST /api/compare`: retorna resum JSON validat.
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
+- `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
 - `GET /api/health`: healthcheck.
 
 ## Frontend
@@ -52,4 +55,21 @@ Per defecte el frontend apunta a `http://localhost:5000/api`.
 
 - El calcul i el render del PDF estan separats.
 - El PDF s'obte a partir d'una plantilla HTML/Jinja.
+- La versio publicada del template es resol des de `backend/config/pdf_templates/comparison/published.json`.
+- El contracte editable del template viu a `backend/config/pdf_templates/comparison/versions/v1/README.md`.
+
+## Publicacio de plantilles
+
+La plantilla productiva es la versio indicada per `published.json`. Per publicar una versio, el backend valida tot el bundle abans d'actualitzar aquest punter de manera atomica:
+
+```bash
+cd backend
+poetry run python manage_templates.py publish comparison v1
+```
+
+El rollback es fa publicant una versio anterior valida:
+
+```bash
+poetry run python manage_templates.py rollback comparison v1
+```
 - El layout actual es un MVP inspirat en l'exemple aportat; falta iterar-lo per clonar fidelment la plantilla final.
