@@ -1,4 +1,4 @@
-## Contracte editable del template `comparison/v1`
+## Contracte editable del template `comparison/versions/v1`
 
 Aquest directori defineix el contracte de configuracio per al PDF de comparativa.
 La renderitzacio continua controlada pel backend; aquests YAML nomes declaren dades segures i limitades.
@@ -117,7 +117,7 @@ La renderitzacio continua controlada pel backend; aquests YAML nomes declaren da
 
 Regles addicionals d'assets:
 
-- Les rutes son relatives a `backend/assets/pdf_templates/comparison/v1/`.
+- Les rutes son relatives a `backend/assets/pdf_templates/comparison/versions/v1/`.
 - No es permeten fitxers de mes de 2 MB.
 - No es permeten esquemes remots (`http://`, `https://`) ni `data:`.
 

@@ -4,6 +4,7 @@ from io import BytesIO
 
 from flask import Blueprint, jsonify, request, send_file
 
+from .config import TemplateResolutionError
 from .services.calculator import ComparisonInputError, build_comparison_report
 from .services.reporting import render_report_pdf
 
@@ -31,13 +32,24 @@ def compare():
 @api.post("/reports/comparison.pdf")
 def comparison_report_pdf():
     payload = request.get_json(silent=True) or {}
+    template_version_raw = payload.get("template_version")
+    template_version = None
+
+    if template_version_raw is not None:
+        template_version = str(template_version_raw).strip()
+        if not template_version:
+            return jsonify({"errors": {"template_version": "La versio de plantilla no pot ser buida."}}), 400
 
     try:
         report = build_comparison_report(payload)
     except ComparisonInputError as exc:
         return jsonify({"errors": exc.errors}), 400
 
-    pdf_bytes = render_report_pdf(report)
+    try:
+        pdf_bytes = render_report_pdf(report, template_version=template_version)
+    except TemplateResolutionError as exc:
+        return jsonify({"errors": {"template_version": str(exc)}}), 404
+
     filename = f"comparison-report-{report['customer']['cups']}.pdf"
     return send_file(
         BytesIO(pdf_bytes),
