@@ -13,6 +13,7 @@ def render_report_pdf(report: dict, template_version: str | None = None) -> byte
         "reports/comparison_report.html",
         report=report,
         content=content,
+        theme=template_bundle.theme,
         euro=euro,
         template_bundle=template_bundle,
     )
