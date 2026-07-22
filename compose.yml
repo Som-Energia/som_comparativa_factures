@@ -1,11 +1,10 @@
 services:
   backend:
-    build:
-      context: ./backend
+    image: "${BACKEND_IMAGE:?Set BACKEND_IMAGE}"
     restart: unless-stopped
     volumes:
-      - template-config:/app/config
-      - template-assets:/app/assets
+      - /mnt/data/docker/comparativa/config:/app/config
+      - /mnt/data/docker/comparativa/assets:/app/assets
     healthcheck:
       test:
         - CMD
@@ -18,8 +17,7 @@ services:
       start_period: 15s
 
   frontend:
-    build:
-      context: ./frontend
+    image: "${FRONTEND_IMAGE:?Set FRONTEND_IMAGE}"
     restart: unless-stopped
     depends_on:
       backend:
@@ -35,10 +33,6 @@ services:
       traefik.http.routers.comparativa-factures.tls: "true"
       traefik.http.routers.comparativa-factures.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:?Set TRAEFIK_CERT_RESOLVER}"
       traefik.http.services.comparativa-factures.loadbalancer.server.port: "80"
-
-volumes:
-  template-config:
-  template-assets:
 
 networks:
   traefik:

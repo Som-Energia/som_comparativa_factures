@@ -89,7 +89,20 @@ El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu
 | `TRAEFIK_NETWORK` | `traefik-public` | Xarxa Docker externa a la qual esta connectat Traefik. |
 | `TRAEFIK_ENTRYPOINT` | `websecure` | Entrypoint HTTPS configurat a Traefik. |
 | `TRAEFIK_CERT_RESOLVER` | `letsencrypt` | Certificate resolver configurat a Traefik. |
+| `BACKEND_IMAGE` | `harbor.somenergia.coop/comparativa/comparativa-backend:v0.1.0` | Imatge immutable del backend publicada a Harbor. |
+| `FRONTEND_IMAGE` | `harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0` | Imatge immutable del frontend publicada a Harbor. |
 
-Enganxeu `compose.yml` com a Stack a Portainer, afegiu les quatre variables i desplegueu-lo. Els volums `template-config` i `template-assets` conserven les plantilles, els assets i la versio publicada entre recreacions del stack. En el primer arrencada, el backend els inicialitza amb la configuracio inclosa a la imatge.
+### Publicar imatges a Harbor
+
+Inicieu sessio al registre i publiqueu les dues imatges amb un tag de versio immutable. El slug del projecte i els noms de repositori s'han de copiar de Harbor; l'script rep les referencies completes per no assumir-ne cap convencio.
+
+```bash
+docker login harbor.somenergia.coop
+./scripts/publish-images.sh \
+  harbor.somenergia.coop/comparativa/comparativa-backend:v0.1.0 \
+  harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0
+```
+
+Enganxeu `compose.yml` com a Stack a Portainer, afegiu les sis variables i desplegueu-lo. Les dades persistents es desen al host sota `/mnt/data/docker/comparativa/`: `config/` conserva les plantilles i la versio publicada, i `assets/` conserva els seus recursos. En el primer arrencada, el backend inicialitza directoris buits amb la configuracio inclosa a la imatge.
 
 L'aplicacio no incorpora autenticacio: l'accés ha d'estar restringit per la VPN de l'organitzacio. Qualsevol usuari de la VPN pot gestionar les plantilles publicades.
