@@ -1,0 +1,37 @@
+meta:
+  template_id: comparison
+  template_version: 2
+
+page:
+  size: A4
+  margin_mm:
+    top: 22
+    right: 18
+    bottom: 22
+    left: 18
+
+colors:
+  background: "#eef1e8"
+  ink: "#1c2d2c"
+  muted: "#66716d"
+  brand: "#17464c"
+  accent: "#d3f85c"
+  soft: "#b8b3ea"
+  line: "#d7ded3"
+  surface: "#ffffff"
+  inverse_text: "#ffffff"
+
+typography:
+  font_family: Arial, sans-serif
+  body_size_px: 12
+  h1_size_px: 28
+  h2_size_px: 24
+  h3_size_px: 18
+
+shape:
+  card_radius_px: 12
+  badge_radius_px: 999
+
+spacing:
+  card_padding_px: 16
+  table_cell_px: 10

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const apiBaseUrl = 'http://localhost:5000/api'
+const apiBaseUrl = '/api'
 
 const initialForm = {
   cups: '',

@@ -6,6 +6,9 @@ import pytest
 import app.config as template_config
 
 
+TEST_DRAFT_VERSION = 99
+
+
 @pytest.fixture
 def template_store(tmp_path, monkeypatch):
     source_templates_dir = template_config.PDF_TEMPLATES_DIR

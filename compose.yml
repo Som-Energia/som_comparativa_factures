@@ -1,0 +1,43 @@
+services:
+  backend:
+    image: "${BACKEND_IMAGE:?Set BACKEND_IMAGE}"
+    volumes:
+      - /mnt/data/docker/comparativa/config:/app/config
+      - /mnt/data/docker/comparativa/assets:/app/assets
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/api/health').read()"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      placement:
+        constraints:
+          - "node.hostname == ${BACKEND_NODE_HOSTNAME:?Set BACKEND_NODE_HOSTNAME}"
+      restart_policy:
+        condition: any
+
+  frontend:
+    image: "${FRONTEND_IMAGE:?Set FRONTEND_IMAGE}"
+    networks:
+      - default
+      - traefik
+    deploy:
+      restart_policy:
+        condition: any
+      labels:
+        traefik.enable: "true"
+        traefik.docker.network: "${TRAEFIK_NETWORK:?Set TRAEFIK_NETWORK}"
+        traefik.http.routers.comparativa-factures.rule: "Host(`${APP_HOSTNAME:?Set APP_HOSTNAME}`)"
+        traefik.http.routers.comparativa-factures.entrypoints: "${TRAEFIK_ENTRYPOINT:?Set TRAEFIK_ENTRYPOINT}"
+        traefik.http.routers.comparativa-factures.tls: "true"
+        traefik.http.services.comparativa-factures.loadbalancer.server.port: "80"
+
+networks:
+  traefik:
+    external: true
+    name: "${TRAEFIK_NETWORK:?Set TRAEFIK_NETWORK}"

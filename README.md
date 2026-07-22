@@ -73,3 +73,36 @@ El rollback es fa publicant una versio anterior valida:
 poetry run python manage_templates.py rollback comparison v1
 ```
 - El layout actual es un MVP inspirat en l'exemple aportat; falta iterar-lo per clonar fidelment la plantilla final.
+
+## Desplegament a Portainer
+
+El fitxer `compose.yml` defineix un stack productiu amb dos contenidors:
+
+- `frontend`: Nginx serveix el build de React i reenvia `/api` al backend dins de la xarxa Docker.
+- `backend`: Gunicorn executa Flask i genera els PDF. No publica cap port al host ni a Traefik.
+
+El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu aquestes variables amb els noms existents a la instancia `moll`:
+
+| Variable | Exemple | Descripcio |
+| --- | --- | --- |
+| `APP_HOSTNAME` | `comparativa.moll.somenergia.coop` | Hostname public del servei. Cal crear-ne el registre DNS cap a Traefik. |
+| `TRAEFIK_NETWORK` | `traefik-public` | Xarxa Docker externa a la qual esta connectat Traefik. |
+| `TRAEFIK_ENTRYPOINT` | `websecure` | Entrypoint HTTPS configurat a Traefik. |
+| `BACKEND_IMAGE` | `harbor.somenergia.coop/comparativa/comparativa-backend:v0.1.0` | Imatge immutable del backend publicada a Harbor. |
+| `FRONTEND_IMAGE` | `harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0` | Imatge immutable del frontend publicada a Harbor. |
+| `BACKEND_NODE_HOSTNAME` | `moll2` | Node Swarm que conté `/mnt/data/docker/comparativa`. El backend queda fixat a aquest node. |
+
+### Publicar imatges a Harbor
+
+Inicieu sessio al registre i publiqueu les dues imatges amb un tag de versio immutable. El slug del projecte i els noms de repositori s'han de copiar de Harbor; l'script rep les referencies completes per no assumir-ne cap convencio.
+
+```bash
+docker login harbor.somenergia.coop
+./scripts/publish-images.sh \
+  harbor.somenergia.coop/comparativa/comparativa-backend:v0.1.0 \
+  harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0
+```
+
+Enganxeu `compose.yml` com a Stack a Portainer, afegiu les sis variables i desplegueu-lo. El fitxer esta preparat per Docker Swarm: les etiquetes de Traefik viuen al servei i el backend queda fixat al node indicat per `BACKEND_NODE_HOSTNAME`. Les dades persistents es desen al host sota `/mnt/data/docker/comparativa/`: `config/` conserva les plantilles i la versio publicada, i `assets/` conserva els seus recursos. En el primer arrencada, el backend inicialitza directoris buits amb la configuracio inclosa a la imatge.
+
+L'aplicacio no incorpora autenticacio: l'accés ha d'estar restringit per la VPN de l'organitzacio. Qualsevol usuari de la VPN pot gestionar les plantilles publicades.

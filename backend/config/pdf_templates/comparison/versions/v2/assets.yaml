@@ -1,0 +1,9 @@
+meta:
+  template_id: comparison
+  template_version: 2
+
+registry: {}
+
+slots:
+  logo: null
+  hero_illustration: null
