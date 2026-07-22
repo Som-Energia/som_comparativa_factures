@@ -73,3 +73,23 @@ El rollback es fa publicant una versio anterior valida:
 poetry run python manage_templates.py rollback comparison v1
 ```
 - El layout actual es un MVP inspirat en l'exemple aportat; falta iterar-lo per clonar fidelment la plantilla final.
+
+## Desplegament a Portainer
+
+El fitxer `compose.yml` defineix un stack productiu amb dos contenidors:
+
+- `frontend`: Nginx serveix el build de React i reenvia `/api` al backend dins de la xarxa Docker.
+- `backend`: Gunicorn executa Flask i genera els PDF. No publica cap port al host ni a Traefik.
+
+El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu aquestes variables amb els noms existents a la instancia `moll`:
+
+| Variable | Exemple | Descripcio |
+| --- | --- | --- |
+| `APP_HOSTNAME` | `comparativa.moll.somenergia.coop` | Hostname public del servei. Cal crear-ne el registre DNS cap a Traefik. |
+| `TRAEFIK_NETWORK` | `traefik-public` | Xarxa Docker externa a la qual esta connectat Traefik. |
+| `TRAEFIK_ENTRYPOINT` | `websecure` | Entrypoint HTTPS configurat a Traefik. |
+| `TRAEFIK_CERT_RESOLVER` | `letsencrypt` | Certificate resolver configurat a Traefik. |
+
+Enganxeu `compose.yml` com a Stack a Portainer, afegiu les quatre variables i desplegueu-lo. Els volums `template-config` i `template-assets` conserven les plantilles, els assets i la versio publicada entre recreacions del stack. En el primer arrencada, el backend els inicialitza amb la configuracio inclosa a la imatge.
+
+L'aplicacio no incorpora autenticacio: l'accés ha d'estar restringit per la VPN de l'organitzacio. Qualsevol usuari de la VPN pot gestionar les plantilles publicades.

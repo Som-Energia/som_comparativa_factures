@@ -1,0 +1,46 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    volumes:
+      - template-config:/app/config
+      - template-assets:/app/assets
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/api/health').read()"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - default
+      - traefik
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_NETWORK:?Set TRAEFIK_NETWORK}"
+      traefik.http.routers.comparativa-factures.rule: "Host(`${APP_HOSTNAME:?Set APP_HOSTNAME}`)"
+      traefik.http.routers.comparativa-factures.entrypoints: "${TRAEFIK_ENTRYPOINT:?Set TRAEFIK_ENTRYPOINT}"
+      traefik.http.routers.comparativa-factures.tls: "true"
+      traefik.http.routers.comparativa-factures.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:?Set TRAEFIK_CERT_RESOLVER}"
+      traefik.http.services.comparativa-factures.loadbalancer.server.port: "80"
+
+volumes:
+  template-config:
+  template-assets:
+
+networks:
+  traefik:
+    external: true
+    name: "${TRAEFIK_NETWORK:?Set TRAEFIK_NETWORK}"
