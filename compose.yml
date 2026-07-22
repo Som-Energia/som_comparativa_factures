@@ -1,7 +1,6 @@
 services:
   backend:
     image: "${BACKEND_IMAGE:?Set BACKEND_IMAGE}"
-    restart: unless-stopped
     volumes:
       - /mnt/data/docker/comparativa/config:/app/config
       - /mnt/data/docker/comparativa/assets:/app/assets
@@ -15,24 +14,28 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    deploy:
+      placement:
+        constraints:
+          - "node.hostname == ${BACKEND_NODE_HOSTNAME:?Set BACKEND_NODE_HOSTNAME}"
+      restart_policy:
+        condition: any
 
   frontend:
     image: "${FRONTEND_IMAGE:?Set FRONTEND_IMAGE}"
-    restart: unless-stopped
-    depends_on:
-      backend:
-        condition: service_healthy
     networks:
       - default
       - traefik
-    labels:
-      traefik.enable: "true"
-      traefik.docker.network: "${TRAEFIK_NETWORK:?Set TRAEFIK_NETWORK}"
-      traefik.http.routers.comparativa-factures.rule: "Host(`${APP_HOSTNAME:?Set APP_HOSTNAME}`)"
-      traefik.http.routers.comparativa-factures.entrypoints: "${TRAEFIK_ENTRYPOINT:?Set TRAEFIK_ENTRYPOINT}"
-      traefik.http.routers.comparativa-factures.tls: "true"
-      traefik.http.routers.comparativa-factures.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:?Set TRAEFIK_CERT_RESOLVER}"
-      traefik.http.services.comparativa-factures.loadbalancer.server.port: "80"
+    deploy:
+      restart_policy:
+        condition: any
+      labels:
+        traefik.enable: "true"
+        traefik.docker.network: "${TRAEFIK_NETWORK:?Set TRAEFIK_NETWORK}"
+        traefik.http.routers.comparativa-factures.rule: "Host(`${APP_HOSTNAME:?Set APP_HOSTNAME}`)"
+        traefik.http.routers.comparativa-factures.entrypoints: "${TRAEFIK_ENTRYPOINT:?Set TRAEFIK_ENTRYPOINT}"
+        traefik.http.routers.comparativa-factures.tls: "true"
+        traefik.http.services.comparativa-factures.loadbalancer.server.port: "80"
 
 networks:
   traefik:
