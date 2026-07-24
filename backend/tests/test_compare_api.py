@@ -39,14 +39,14 @@ def test_compare_returns_report_summary_for_valid_payload():
     }
     assert body["comparison"] == {
         "competitor_total": 54.0,
-        "som_total": 38.83,
-        "savings": 15.17,
+        "som_total": 46.19,
+        "savings": 7.81,
         "savings_label": "Estalvi",
     }
     assert len(body["breakdown"]["energy"]) == 3
     assert body["breakdown"]["totals"][-1] == {
         "label": "Total",
-        "amount": 38.83,
+        "amount": 46.19,
         "is_total": True,
     }
 
@@ -89,8 +89,8 @@ def test_compare_applies_surplus_compensation_beyond_energy_cost():
 
     assert response.status_code == 200
     body = response.get_json()
-    assert body["comparison"]["som_total"] == 0.07
-    assert body["breakdown"]["totals"][-4] == {"label": "Compensació d'excedents", "amount": -0.12}
+    assert body["comparison"]["som_total"] == 0.16
+    assert body["breakdown"]["totals"][-4] == {"label": "Compensació d'excedents", "amount": -0.06}
     assert body["breakdown"]["flux_solar_kwh"] == 0.0
 
 
@@ -104,7 +104,7 @@ def test_compare_limits_total_to_zero_and_returns_flux_solar():
             billing_days=1,
             energy_by_periods={"P1": 0, "P2": 0, "P3": 0},
             contracted_power_kw_by_periods={"P1": 0, "P2": 0},
-            self_consumption_surplus_kwh=3,
+            self_consumption_surplus_kwh=6,
             meter_rental_eur=0,
             vat_rate_percent=0,
             electric_tax_rate_percent=0,
@@ -114,7 +114,7 @@ def test_compare_limits_total_to_zero_and_returns_flux_solar():
     assert response.status_code == 200
     body = response.get_json()
     assert body["comparison"]["som_total"] == 0.0
-    assert body["breakdown"]["flux_solar_kwh"] == 0.67
+    assert body["breakdown"]["flux_solar_kwh"] == 1.33
 
 
 def test_compare_rejects_negative_billing_values_and_invalid_percentages():
