@@ -392,8 +392,8 @@ def _validate_content_template(content: dict[str, Any], expected_version: int) -
     _validate_exact_keys(invoice_card, "content.invoice_card", required={"title", "labels"})
     _validate_plain_string(invoice_card["title"], "content.invoice_card.title", min_length=1, max_length=60)
     invoice_labels = _expect_dict(invoice_card["labels"], "content.invoice_card.labels")
-    _validate_exact_keys(invoice_labels, "content.invoice_card.labels", required={"titular", "cups", "billing_days"})
-    for key in ("titular", "cups", "billing_days"):
+    _validate_exact_keys(invoice_labels, "content.invoice_card.labels", required={"titular", "cups", "billing_days", "flux_solar"})
+    for key in ("titular", "cups", "billing_days", "flux_solar"):
         _validate_plain_string(invoice_labels[key], f"content.invoice_card.labels.{key}", min_length=1, max_length=30)
 
     energy_table = _expect_dict(content["energy_table"], "content.energy_table")

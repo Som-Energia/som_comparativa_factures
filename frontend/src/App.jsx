@@ -13,6 +13,14 @@ const initialForm = {
     P2: '',
     P3: '',
   },
+  contracted_power_kw_by_periods: {
+    P1: '',
+    P2: '',
+  },
+  self_consumption_surplus_kwh: '',
+  meter_rental_eur: '',
+  vat_rate_percent: '21',
+  electric_tax_rate_percent: '5.11',
 }
 
 const initialTemplateFiles = {
@@ -68,6 +76,16 @@ function CompareScreen() {
     }))
   }
 
+  function updatePowerPeriod(period, value) {
+    setForm((current) => ({
+      ...current,
+      contracted_power_kw_by_periods: {
+        ...current.contracted_power_kw_by_periods,
+        [period]: value,
+      },
+    }))
+  }
+
   function buildPayload() {
     const payload = {
       cups: form.cups,
@@ -79,6 +97,14 @@ function CompareScreen() {
         P2: Number(form.energy_by_periods.P2),
         P3: Number(form.energy_by_periods.P3),
       },
+      contracted_power_kw_by_periods: {
+        P1: Number(form.contracted_power_kw_by_periods.P1),
+        P2: Number(form.contracted_power_kw_by_periods.P2),
+      },
+      self_consumption_surplus_kwh: Number(form.self_consumption_surplus_kwh),
+      meter_rental_eur: Number(form.meter_rental_eur),
+      vat_rate_percent: Number(form.vat_rate_percent),
+      electric_tax_rate_percent: Number(form.electric_tax_rate_percent),
     }
 
     const templateVersion = form.template_version.trim()
@@ -141,7 +167,7 @@ function CompareScreen() {
 
   function handleOpenHtmlPreview() {
     const templateVersion = form.template_version.trim()
-    const previewUrl = new URL(`${apiBaseUrl}/reports/comparison.preview`)
+    const previewUrl = new URL(`${apiBaseUrl}/reports/comparison.preview`, window.location.origin)
 
     if (templateVersion) {
       previewUrl.searchParams.set('template_version', templateVersion)
@@ -152,17 +178,27 @@ function CompareScreen() {
 
   return (
     <div className="layout">
-      <form className="form-card" onSubmit={handlePreview}>
+      <form className="form-card" onSubmit={handlePreview} autoComplete="on">
         <section className="form-section">
           <h2>Titular i contracte</h2>
           <label>
             Titular
-            <input value={form.titular} onChange={(event) => updateField('titular', event.target.value)} />
+            <input
+              name="titular"
+              autoComplete="name"
+              value={form.titular}
+              onChange={(event) => updateField('titular', event.target.value)}
+            />
             <FieldError error={errors.titular} />
           </label>
           <label>
             CUPS
-            <input value={form.cups} onChange={(event) => updateField('cups', event.target.value)} />
+            <input
+              name="cups"
+              autoComplete="on"
+              value={form.cups}
+              onChange={(event) => updateField('cups', event.target.value)}
+            />
             <FieldError error={errors.cups} />
           </label>
         </section>
@@ -173,6 +209,8 @@ function CompareScreen() {
             Dies d'energia facturada
             <input
               type="number"
+              name="billing_days"
+              autoComplete="on"
               min="1"
               value={form.billing_days}
               onChange={(event) => updateField('billing_days', event.target.value)}
@@ -183,6 +221,8 @@ function CompareScreen() {
             Import factura competència
             <input
               type="number"
+              name="competitor_invoice_amount"
+              autoComplete="on"
               min="0"
               step="0.01"
               value={form.competitor_invoice_amount}
@@ -190,6 +230,49 @@ function CompareScreen() {
             />
             <FieldError error={errors.competitor_invoice_amount} />
           </label>
+          <label>
+            Lloguer del comptador (EUR)
+            <input
+              type="number"
+              name="meter_rental_eur"
+              autoComplete="on"
+              min="0"
+              step="0.01"
+              value={form.meter_rental_eur}
+              onChange={(event) => updateField('meter_rental_eur', event.target.value)}
+            />
+            <FieldError error={errors.meter_rental_eur} />
+          </label>
+          <div className="two-column-grid">
+            <label>
+              IVA (%)
+              <input
+                type="number"
+                name="vat_rate_percent"
+                autoComplete="on"
+                min="0"
+                max="100"
+                step="0.01"
+                value={form.vat_rate_percent}
+                onChange={(event) => updateField('vat_rate_percent', event.target.value)}
+              />
+              <FieldError error={errors.vat_rate_percent} />
+            </label>
+            <label>
+              IESE (%)
+              <input
+                type="number"
+                name="electric_tax_rate_percent"
+                autoComplete="on"
+                min="0"
+                max="100"
+                step="0.01"
+                value={form.electric_tax_rate_percent}
+                onChange={(event) => updateField('electric_tax_rate_percent', event.target.value)}
+              />
+              <FieldError error={errors.electric_tax_rate_percent} />
+            </label>
+          </div>
           <label>
             Versio de plantilla (opcional)
             <input
@@ -205,6 +288,40 @@ function CompareScreen() {
         </section>
 
         <section className="form-section">
+          <h2>Potència i autoconsum</h2>
+          <div className="two-column-grid">
+            {['P1', 'P2'].map((period) => (
+              <label key={period}>
+                Potència contractada {period} (kW)
+                <input
+                  type="number"
+                  name={`contracted_power_kw_${period}`}
+                  autoComplete="on"
+                  min="0"
+                  step="0.01"
+                  value={form.contracted_power_kw_by_periods[period]}
+                  onChange={(event) => updatePowerPeriod(period, event.target.value)}
+                />
+                <FieldError error={errors[`contracted_power_kw_by_periods.${period}`]} />
+              </label>
+            ))}
+          </div>
+          <label>
+            Excedents d'autoconsum (kWh)
+            <input
+              type="number"
+              name="self_consumption_surplus_kwh"
+              autoComplete="on"
+              min="0"
+              step="0.01"
+              value={form.self_consumption_surplus_kwh}
+              onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
+            />
+            <FieldError error={errors.self_consumption_surplus_kwh} />
+          </label>
+        </section>
+
+        <section className="form-section">
           <h2>Consum per períodes</h2>
           <div className="period-grid">
             {['P1', 'P2', 'P3'].map((period) => (
@@ -212,6 +329,8 @@ function CompareScreen() {
                 {period} (kWh)
                 <input
                   type="number"
+                  name={`energy_kwh_${period}`}
+                  autoComplete="on"
                   min="0"
                   step="0.01"
                   value={form.energy_by_periods[period]}
@@ -253,6 +372,10 @@ function CompareScreen() {
               <p><strong>Titular:</strong> {preview.customer.titular}</p>
               <p><strong>CUPS:</strong> {preview.customer.cups}</p>
               <p><strong>Dies:</strong> {preview.input.billing_days}</p>
+              <p><strong>Flux Solar:</strong> {formatKwh(preview.breakdown.flux_solar_kwh)}</p>
+              {preview.breakdown.flux_solar_kwh > 0 && (
+                <p className="field-help">Disponible com a descompte en factures posteriors.</p>
+              )}
             </section>
 
             <section className="mini-section">
@@ -600,6 +723,12 @@ function formatEuro(amount) {
     style: 'currency',
     currency: 'EUR',
   }).format(amount)
+}
+
+function formatKwh(amount) {
+  return new Intl.NumberFormat('ca-ES', {
+    maximumFractionDigits: 2,
+  }).format(amount) + ' kWh'
 }
 
 export default App

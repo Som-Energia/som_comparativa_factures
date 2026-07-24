@@ -27,6 +27,7 @@ invoice_card:
     titular: Titular
     cups: CUPS
     billing_days: Dies
+    flux_solar: Flux Solar
 
 energy_table:
   title: Energia per periodes
