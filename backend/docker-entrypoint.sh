@@ -7,6 +7,9 @@ if [ ! -f /app/config/pricing.json ]; then
     cp -a /seed-config/. /app/config/
 fi
 
+# Pricing is versioned product configuration; templates remain user-managed.
+cp /seed-config/pricing.json /app/config/pricing.json
+
 if [ ! -d /app/assets/pdf_templates ]; then
     cp -a /seed-assets/. /app/assets/
 fi

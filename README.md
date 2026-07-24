@@ -111,6 +111,6 @@ docker login harbor.somenergia.coop
   harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0
 ```
 
-Enganxeu `compose.yml` com a Stack a Portainer, afegiu les sis variables i desplegueu-lo. El fitxer esta preparat per Docker Swarm: les etiquetes de Traefik viuen al servei i el backend queda fixat al node indicat per `BACKEND_NODE_HOSTNAME`. Les dades persistents es desen al host sota `/mnt/data/docker/comparativa/`: `config/` conserva les plantilles i la versio publicada, i `assets/` conserva els seus recursos. En el primer arrencada, el backend inicialitza directoris buits amb la configuracio inclosa a la imatge.
+Enganxeu `compose.yml` com a Stack a Portainer, afegiu les sis variables i desplegueu-lo. El fitxer esta preparat per Docker Swarm: les etiquetes de Traefik viuen al servei i el backend queda fixat al node indicat per `BACKEND_NODE_HOSTNAME`. Les dades persistents es desen al host sota `/mnt/data/docker/comparativa/`: `config/` conserva les plantilles i la versio publicada, i `assets/` conserva els seus recursos. En el primer arrencada, el backend inicialitza directoris buits amb la configuracio inclosa a la imatge. A cada arrencada, `pricing.json` s'actualitza des de la imatge publicada; les plantilles persistents no se sobreescriuen.
 
 L'aplicacio no incorpora autenticacio: l'accés ha d'estar restringit per la VPN de l'organitzacio. Qualsevol usuari de la VPN pot gestionar les plantilles publicades.
