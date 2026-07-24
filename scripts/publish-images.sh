@@ -8,6 +8,7 @@ fi
 
 backend_image=$1
 frontend_image=$2
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 backend_image_name=${backend_image##*/}
 frontend_image_name=${frontend_image##*/}
@@ -37,3 +38,11 @@ docker push "$backend_latest_image"
 docker build --pull --tag "$frontend_image" --tag "$frontend_latest_image" frontend
 docker push "$frontend_image"
 docker push "$frontend_latest_image"
+
+if [ -n "${PORTAINER_URL:-}${PORTAINER_API_TOKEN:-}" ]; then
+    : "${PORTAINER_URL:?Set PORTAINER_URL to redeploy through Portainer.}"
+    : "${PORTAINER_API_TOKEN:?Set PORTAINER_API_TOKEN to redeploy through Portainer.}"
+    PORTAINER_STACK_NAME=${PORTAINER_STACK_NAME:-som_comparativa_factures}
+    export PORTAINER_STACK_NAME
+    python3 "$script_dir/redeploy-portainer.py"
+fi
