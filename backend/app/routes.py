@@ -32,6 +32,14 @@ SAMPLE_PREVIEW_PAYLOAD = {
         "P2": 41.55,
         "P3": 88.63,
     },
+    "contracted_power_kw_by_periods": {
+        "P1": 2.3,
+        "P2": 2.3,
+    },
+    "self_consumption_surplus_kwh": 0,
+    "meter_rental_eur": 0.81,
+    "vat_rate_percent": 21,
+    "electric_tax_rate_percent": 5.11,
 }
 
 

@@ -7,6 +7,11 @@
     "P2": 0.124,
     "P3": 0.097
   },
+  "contracted_power_prices_eur_per_kw_day": {
+    "P1": 0.04507,
+    "P2": 0.04507
+  },
+  "self_consumption_surplus_price_eur_per_kwh": 0.06,
   "regulated_charge_eur_per_day": 0.1237,
   "social_bonus_eur_per_day": 0.019,
   "meter_rental_eur": 0.81,
