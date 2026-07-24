@@ -70,6 +70,17 @@ def test_compare_returns_validation_errors_for_invalid_payload():
     }
 
 
+def test_comparison_html_preview_renders_submitted_payload():
+    app = create_app()
+    client = app.test_client()
+
+    response = client.post("/api/reports/comparison.preview", json=build_payload(titular="Persona JSON"))
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/html"
+    assert "Persona JSON" in response.get_data(as_text=True)
+
+
 def test_compare_applies_surplus_compensation_beyond_energy_cost():
     app = create_app()
     client = app.test_client()

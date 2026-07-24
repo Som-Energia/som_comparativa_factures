@@ -106,6 +106,28 @@ def comparison_report_preview():
     return Response(html, mimetype="text/html")
 
 
+@api.post("/reports/comparison.preview")
+def comparison_report_preview_from_payload():
+    payload = request.get_json(silent=True) or {}
+    template_version = _extract_template_version(payload)
+    if isinstance(template_version, Response):
+        return template_version
+
+    try:
+        report = build_comparison_report(payload)
+    except ComparisonInputError as exc:
+        return jsonify({"errors": exc.errors}), 400
+
+    try:
+        html = render_report_html(report, template_version=template_version)
+    except TemplateValidationError as exc:
+        return jsonify({"errors": {"template_version": str(exc)}}), 422
+    except TemplateResolutionError as exc:
+        return jsonify({"errors": {"template_version": str(exc)}}), 404
+
+    return Response(html, mimetype="text/html")
+
+
 @api.get("/templates/comparison/publication")
 def comparison_template_publication_status():
     try:
