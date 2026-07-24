@@ -167,7 +167,7 @@ function CompareScreen() {
 
   function handleOpenHtmlPreview() {
     const templateVersion = form.template_version.trim()
-    const previewUrl = new URL(`${apiBaseUrl}/reports/comparison.preview`)
+    const previewUrl = new URL(`${apiBaseUrl}/reports/comparison.preview`, window.location.origin)
 
     if (templateVersion) {
       previewUrl.searchParams.set('template_version', templateVersion)
