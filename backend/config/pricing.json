@@ -12,7 +12,7 @@
     "P2": 0.0080958904109589
   },
   "self_consumption_surplus_price_eur_per_kwh": 0.03,
-  "regulated_charge_eur_per_day": 0.1237,
+  "regulated_charge_eur_per_day": 0.0,
   "social_bonus_eur_per_day": 0.024688,
   "meter_rental_eur": 0.81,
   "electric_tax_rate": 0.0511,
