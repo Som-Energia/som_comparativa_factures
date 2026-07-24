@@ -103,6 +103,7 @@ El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu
 ### Publicar imatges a Harbor
 
 Inicieu sessio al registre i publiqueu les dues imatges amb un tag de versio immutable. El slug del projecte i els noms de repositori s'han de copiar de Harbor; l'script rep les referencies completes per no assumir-ne cap convencio.
+L'script també actualitza el tag mutable `latest`; el stack de Portainer ha de continuar fent servir el tag immutable de versió.
 
 ```bash
 docker login harbor.somenergia.coop
