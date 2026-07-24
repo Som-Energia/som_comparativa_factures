@@ -57,10 +57,13 @@ function App() {
 
 function CompareScreen() {
   const [form, setForm] = useState(initialForm)
+  const [inputMode, setInputMode] = useState('form')
+  const [rawJson, setRawJson] = useState('')
   const [errors, setErrors] = useState({})
   const [preview, setPreview] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [openingHtmlPreview, setOpeningHtmlPreview] = useState(false)
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }))
@@ -87,6 +90,21 @@ function CompareScreen() {
   }
 
   function buildPayload() {
+    if (inputMode === 'json') {
+      try {
+        const payload = JSON.parse(rawJson)
+        if (!payload || Array.isArray(payload)) {
+          throw new Error('El JSON ha de contenir un objecte de comparativa.')
+        }
+        return payload
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          throw new Error('El JSON no és vàlid.')
+        }
+        throw error
+      }
+    }
+
     const payload = {
       cups: form.cups,
       titular: form.titular,
@@ -115,15 +133,35 @@ function CompareScreen() {
     return payload
   }
 
+  function getPayload() {
+    try {
+      return buildPayload()
+    } catch (error) {
+      setErrors({ raw_json: error.message })
+      return null
+    }
+  }
+
+  function changeInputMode(mode) {
+    setInputMode(mode)
+    setErrors({})
+    setPreview(null)
+  }
+
   async function handlePreview(event) {
     event.preventDefault()
+    const payload = getPayload()
+    if (!payload) {
+      return
+    }
+
     setLoadingPreview(true)
     setErrors({})
 
     const response = await fetch(`${apiBaseUrl}/compare`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload()),
+      body: JSON.stringify(payload),
     })
 
     const data = await response.json()
@@ -139,13 +177,18 @@ function CompareScreen() {
   }
 
   async function handleDownload() {
+    const payload = getPayload()
+    if (!payload) {
+      return
+    }
+
     setDownloading(true)
     setErrors({})
 
     const response = await fetch(`${apiBaseUrl}/reports/comparison.pdf`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload()),
+      body: JSON.stringify(payload),
     })
 
     setDownloading(false)
@@ -165,20 +208,54 @@ function CompareScreen() {
     URL.revokeObjectURL(url)
   }
 
-  function handleOpenHtmlPreview() {
-    const templateVersion = form.template_version.trim()
-    const previewUrl = new URL(`${apiBaseUrl}/reports/comparison.preview`, window.location.origin)
-
-    if (templateVersion) {
-      previewUrl.searchParams.set('template_version', templateVersion)
+  async function handleOpenHtmlPreview() {
+    const payload = getPayload()
+    if (!payload) {
+      return
     }
 
-    window.open(previewUrl.toString(), '_blank', 'noopener,noreferrer')
+    const previewWindow = window.open('', '_blank')
+    setOpeningHtmlPreview(true)
+    setErrors({})
+
+    const response = await fetch(`${apiBaseUrl}/reports/comparison.preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    setOpeningHtmlPreview(false)
+
+    if (!response.ok) {
+      const data = await response.json()
+      previewWindow?.close()
+      setErrors(data.errors || {})
+      return
+    }
+
+    const url = URL.createObjectURL(await response.blob())
+    if (previewWindow) {
+      previewWindow.location.href = url
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
   return (
     <div className="layout">
       <form className="form-card" onSubmit={handlePreview} autoComplete="on">
+        <div className="input-mode-switcher" role="group" aria-label="Mode d'entrada">
+          <button type="button" className={inputMode === 'form' ? '' : 'tertiary'} onClick={() => changeInputMode('form')}>
+            Formulari
+          </button>
+          <button type="button" className={inputMode === 'json' ? '' : 'tertiary'} onClick={() => changeInputMode('json')}>
+            JSON
+          </button>
+        </div>
+
+        {inputMode === 'form' ? (
+          <>
         <section className="form-section">
           <h2>Titular i contracte</h2>
           <label>
@@ -281,7 +358,7 @@ function CompareScreen() {
               placeholder="v1"
             />
             <small className="field-help">
-              Si el deixeu buit, es farà servir la versió publicada. El preview HTML usa dades de mostra representatives.
+              Si el deixeu buit, es farà servir la versió publicada.
             </small>
             <FieldError error={errors.template_version} />
           </label>
@@ -342,6 +419,29 @@ function CompareScreen() {
           </div>
         </section>
 
+          </>
+        ) : (
+          <section className="form-section">
+            <h2>Entrada JSON</h2>
+            <p className="section-copy">
+              Enganxeu el payload de comparativa. Aquest serà el punt d’entrada per a una futura extracció de PDF a JSON.
+            </p>
+            <label>
+              JSON de la factura
+              <textarea
+                className="json-input"
+                name="raw_json"
+                autoComplete="off"
+                spellCheck="false"
+                value={rawJson}
+                onChange={(event) => setRawJson(event.target.value)}
+                placeholder={'{\n  "cups": "ES0210002100000000ZN0F",\n  "titular": "Persona Persona"\n}'}
+              />
+              <FieldError error={errors.raw_json} />
+            </label>
+          </section>
+        )}
+
         <div className="actions">
           <button type="submit" disabled={loadingPreview}>
             {loadingPreview ? 'Calculant...' : 'Veure resum'}
@@ -349,8 +449,8 @@ function CompareScreen() {
           <button type="button" className="secondary" disabled={!preview || downloading} onClick={handleDownload}>
             {downloading ? 'Generant PDF...' : 'Descarregar PDF'}
           </button>
-          <button type="button" className="tertiary" onClick={handleOpenHtmlPreview}>
-            Obrir preview HTML
+          <button type="button" className="tertiary" disabled={openingHtmlPreview} onClick={handleOpenHtmlPreview}>
+            {openingHtmlPreview ? 'Obrint preview...' : 'Obrir preview HTML'}
           </button>
         </div>
       </form>

@@ -217,6 +217,19 @@ textarea {
   gap: 16px;
 }
 
+.input-mode-switcher {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.json-input {
+  min-height: 380px;
+  resize: vertical;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  line-height: 1.45;
+}
+
 .actions {
   display: flex;
   gap: 12px;
