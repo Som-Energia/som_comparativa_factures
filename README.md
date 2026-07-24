@@ -103,6 +103,17 @@ El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu
 ### Publicar imatges a Harbor
 
 Inicieu sessio al registre i publiqueu les dues imatges amb un tag de versio immutable. El slug del projecte i els noms de repositori s'han de copiar de Harbor; l'script rep les referencies completes per no assumir-ne cap convencio.
+L'script també actualitza el tag mutable `latest`; el stack de Portainer pot usar-lo per a desplegaments automàtics, mentre que els tags immutables de versió serveixen per identificar i recuperar desplegaments anteriors.
+
+Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
+
+```bash
+export PORTAINER_URL="https://portainer.example.org"
+export PORTAINER_API_TOKEN="..."
+export PORTAINER_STACK_NAME="som_comparativa_factures"
+```
+
+Amb aquestes variables, `publish-images.sh` conserva el `compose.yml` i les variables actuals del stack, força un pull de `latest` i en demana el redeploy mitjançant l'API de Portainer. Si el certificat de Portainer és autosignat, afegiu explícitament `PORTAINER_INSECURE_TLS=1`.
 
 ```bash
 docker login harbor.somenergia.coop
