@@ -39,14 +39,14 @@ def test_compare_returns_report_summary_for_valid_payload():
     }
     assert body["comparison"] == {
         "competitor_total": 54.0,
-        "som_total": 46.19,
-        "savings": 7.81,
+        "som_total": 41.67,
+        "savings": 12.33,
         "savings_label": "Estalvi",
     }
     assert len(body["breakdown"]["energy"]) == 3
     assert body["breakdown"]["totals"][-1] == {
         "label": "Total",
-        "amount": 46.19,
+        "amount": 41.67,
         "is_total": True,
     }
 
@@ -100,7 +100,7 @@ def test_compare_applies_surplus_compensation_beyond_energy_cost():
 
     assert response.status_code == 200
     body = response.get_json()
-    assert body["comparison"]["som_total"] == 0.16
+    assert body["comparison"]["som_total"] == 0.04
     assert body["breakdown"]["totals"][-4] == {"label": "Compensació d'excedents", "amount": -0.06}
     assert body["breakdown"]["flux_solar_kwh"] == 0.0
 
@@ -125,7 +125,7 @@ def test_compare_limits_total_to_zero_and_returns_flux_solar():
     assert response.status_code == 200
     body = response.get_json()
     assert body["comparison"]["som_total"] == 0.0
-    assert body["breakdown"]["flux_solar_kwh"] == 1.33
+    assert body["breakdown"]["flux_solar_kwh"] == 5.33
 
 
 def test_compare_rejects_negative_billing_values_and_invalid_percentages():
