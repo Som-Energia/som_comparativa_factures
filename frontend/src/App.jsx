@@ -178,17 +178,27 @@ function CompareScreen() {
 
   return (
     <div className="layout">
-      <form className="form-card" onSubmit={handlePreview}>
+      <form className="form-card" onSubmit={handlePreview} autoComplete="on">
         <section className="form-section">
           <h2>Titular i contracte</h2>
           <label>
             Titular
-            <input value={form.titular} onChange={(event) => updateField('titular', event.target.value)} />
+            <input
+              name="titular"
+              autoComplete="name"
+              value={form.titular}
+              onChange={(event) => updateField('titular', event.target.value)}
+            />
             <FieldError error={errors.titular} />
           </label>
           <label>
             CUPS
-            <input value={form.cups} onChange={(event) => updateField('cups', event.target.value)} />
+            <input
+              name="cups"
+              autoComplete="on"
+              value={form.cups}
+              onChange={(event) => updateField('cups', event.target.value)}
+            />
             <FieldError error={errors.cups} />
           </label>
         </section>
@@ -199,6 +209,8 @@ function CompareScreen() {
             Dies d'energia facturada
             <input
               type="number"
+              name="billing_days"
+              autoComplete="on"
               min="1"
               value={form.billing_days}
               onChange={(event) => updateField('billing_days', event.target.value)}
@@ -209,6 +221,8 @@ function CompareScreen() {
             Import factura competència
             <input
               type="number"
+              name="competitor_invoice_amount"
+              autoComplete="on"
               min="0"
               step="0.01"
               value={form.competitor_invoice_amount}
@@ -220,6 +234,8 @@ function CompareScreen() {
             Lloguer del comptador (EUR)
             <input
               type="number"
+              name="meter_rental_eur"
+              autoComplete="on"
               min="0"
               step="0.01"
               value={form.meter_rental_eur}
@@ -232,6 +248,8 @@ function CompareScreen() {
               IVA (%)
               <input
                 type="number"
+                name="vat_rate_percent"
+                autoComplete="on"
                 min="0"
                 max="100"
                 step="0.01"
@@ -244,6 +262,8 @@ function CompareScreen() {
               IESE (%)
               <input
                 type="number"
+                name="electric_tax_rate_percent"
+                autoComplete="on"
                 min="0"
                 max="100"
                 step="0.01"
@@ -275,6 +295,8 @@ function CompareScreen() {
                 Potència contractada {period} (kW)
                 <input
                   type="number"
+                  name={`contracted_power_kw_${period}`}
+                  autoComplete="on"
                   min="0"
                   step="0.01"
                   value={form.contracted_power_kw_by_periods[period]}
@@ -288,6 +310,8 @@ function CompareScreen() {
             Excedents d'autoconsum (kWh)
             <input
               type="number"
+              name="self_consumption_surplus_kwh"
+              autoComplete="on"
               min="0"
               step="0.01"
               value={form.self_consumption_surplus_kwh}
@@ -305,6 +329,8 @@ function CompareScreen() {
                 {period} (kWh)
                 <input
                   type="number"
+                  name={`energy_kwh_${period}`}
+                  autoComplete="on"
                   min="0"
                   step="0.01"
                   value={form.energy_by_periods[period]}
