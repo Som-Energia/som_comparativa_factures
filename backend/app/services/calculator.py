@@ -70,9 +70,11 @@ def build_comparison_report(payload: dict) -> dict:
     surplus_price = Decimal(str(pricing["self_consumption_surplus_price_eur_per_kwh"]))
     compensation_requested = _money(data.self_consumption_surplus_kwh * surplus_price)
     compensation_applied = min(compensation_requested, subtotal_before_compensation)
+    non_compensated_surplus = _money(compensation_requested - compensation_applied)
     subtotal = subtotal_before_compensation - compensation_applied
     surplus_used_kwh = min(data.self_consumption_surplus_kwh, compensation_applied / surplus_price)
     flux_solar_kwh = _quantity(data.self_consumption_surplus_kwh - surplus_used_kwh)
+    flux_solar_eur = _money(non_compensated_surplus * Decimal("0.80"))
     electric_tax = _money(subtotal * data.electric_tax_rate)
     vat_tax = _money((subtotal + electric_tax) * data.vat_rate)
     som_total = _money(subtotal + electric_tax + vat_tax)
@@ -110,6 +112,18 @@ def build_comparison_report(payload: dict) -> dict:
             "energy": energy_breakdown,
             "power": power_breakdown,
             "flux_solar_kwh": float(flux_solar_kwh),
+            "non_compensated_surplus_eur": float(non_compensated_surplus),
+            "flux_solar_eur": float(flux_solar_eur),
+            "costs": {
+                "power_eur": float(power_total),
+                "energy_eur": float(energy_total),
+                "surplus_compensation_eur": float(compensation_applied),
+                "adjustment_services_eur": float(regulated_charge),
+                "social_bonus_eur": float(social_bonus),
+                "electric_tax_eur": float(electric_tax),
+                "meter_rental_eur": float(meter_rental),
+                "vat_eur": float(vat_tax),
+            },
             "totals": [
                 {"label": "Cost per l'energia utilitzada", "amount": float(energy_total)},
                 *[

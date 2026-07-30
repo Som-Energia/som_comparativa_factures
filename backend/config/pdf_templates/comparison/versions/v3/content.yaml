@@ -1,0 +1,52 @@
+meta:
+  template_id: comparison
+  template_version: 3
+  locale: ca
+
+hero:
+  title: Simulació factura Som Energia
+  intro:
+    - La versió 3 fa servir el document comercial aprovat com a base.
+  customer_labels:
+    titular: Titular
+    cups: CUPS
+  badge_text: Tarifa {pricing.tariff_name}
+
+summary:
+  title: Simulació de cost de la factura
+  columns:
+    current_cost: Cost actual
+    som_cost: Cost amb Som Energia
+    savings_positive: Estalvi
+    savings_negative: Diferència
+
+invoice_card:
+  title: Dades de la factura
+  labels:
+    titular: Titular
+    cups: CUPS
+    billing_days: Dies del període facturat
+    flux_solar: Flux Solar
+
+energy_table:
+  title: Períodes tarifaris
+  columns:
+    period: Període
+    kwh: kWh
+    unit_price: Preu
+    amount: Import
+
+breakdown:
+  title: Cost calculat
+
+legal:
+  disclaimer: Aquesta simulació només és vàlida per aquesta factura i no és extrapolable a altres factures.
+
+cta:
+  title: Com et pots unir a Som Energia?
+  body:
+    - Consulta la plantilla comercial aprovada.
+  services_title: Serveis inclosos
+  services:
+    - Electricitat 100% renovable certificada.
+  primary_action: null
