@@ -2,6 +2,9 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
+
 COPY package.json package-lock.json ./
 RUN npm ci
 

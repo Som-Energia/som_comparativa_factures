@@ -116,7 +116,7 @@ El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu
 Inicieu sessio al registre i publiqueu les dues imatges amb un tag de versio immutable. El slug del projecte i els noms de repositori s'han de copiar de Harbor; l'script rep les referencies completes per no assumir-ne cap convencio.
 L'script també actualitza el tag mutable `latest`; el stack de Portainer pot usar-lo per a desplegaments automàtics, mentre que els tags immutables de versió serveixen per identificar i recuperar desplegaments anteriors.
 
-La versió de l'aplicació viu a `VERSION` i s'aplica a les imatges de frontend i backend. Quan la publicació d'ambdues imatges té èxit, l'script crea i puja el tag Git anotat corresponent, com `v0.2.2`. Per evitar etiquetar codi que no correspon a les imatges, exigeix que l'arbre de treball estiga net i que el tag no existisca localment ni a `origin`. Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
+La versió de l'aplicació viu exclusivament a `VERSION`: el frontend la mostra, les imatges de frontend i backend la fan servir com a tag i determina el tag Git anotat, com `v0.3.0`. Quan la publicació d'ambdues imatges té èxit, l'script crea i puja aquest tag. Per evitar etiquetar codi que no correspon a les imatges, exigeix que l'arbre de treball estiga net i que el tag no existisca localment ni a `origin`. Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
 
 ```bash
 export PORTAINER_URL="https://portainer.example.org"

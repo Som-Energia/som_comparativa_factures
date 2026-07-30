@@ -1,7 +1,6 @@
 {
   "name": "webservice-factura-frontend",
   "private": true,
-  "version": "0.2.2",
   "type": "module",
   "scripts": {
     "dev": "vite",

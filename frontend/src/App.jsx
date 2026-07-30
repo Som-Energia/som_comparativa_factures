@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 const apiBaseUrl = '/api'
-const appVersion = 'v0.2.2'
+const appVersion = __APP_VERSION__
 
 const initialForm = {
   cups: '',
