@@ -1,6 +1,8 @@
 services:
   backend:
     image: "${BACKEND_IMAGE:?Set BACKEND_IMAGE}"
+    environment:
+      INVOICE_EXTRACTOR_API_TOKEN: "${INVOICE_EXTRACTOR_API_TOKEN:?Set INVOICE_EXTRACTOR_API_TOKEN}"
     volumes:
       - /mnt/data/docker/comparativa/config:/app/config
       - /mnt/data/docker/comparativa/assets:/app/assets

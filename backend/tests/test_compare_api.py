@@ -1,3 +1,6 @@
+from io import BytesIO
+from unittest.mock import patch
+
 from app import create_app
 
 
@@ -150,4 +153,71 @@ def test_compare_rejects_negative_billing_values_and_invalid_percentages():
         "meter_rental_eur": "El lloguer del comptador ha de ser positiu o zero.",
         "self_consumption_surplus_kwh": "Els excedents d'autoconsum han de ser positius o zero.",
         "vat_rate_percent": "El tipus d'IVA ha de ser entre 0 i 100.",
+    }
+
+
+def build_extraction():
+    return {
+        "retailer": "Iberdrola",
+        "cups": "ES0210002100000000ZN0F",
+        "titular": "Persona Persona",
+        "billing_days": 30,
+        "competitor_invoice_amount": 54.0,
+        "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
+        "contracted_powers": {"P1": 2.3, "P2": 2.3, "P3": 2.3},
+        "meter_rental": 0.81,
+        "vat_amount": 11.34,
+        "vat_rate": 21.0,
+        "electricity_tax": 1.35,
+        "electricity_tax_rate": 5.11,
+        "surplus_kwh": None,
+        "data_quality": {"status": "needs_review", "issues": []},
+    }
+
+
+def test_external_extraction_requires_a_bearer_token(monkeypatch):
+    monkeypatch.setenv("INVOICE_EXTRACTOR_API_TOKEN", "test-token")
+    client = create_app().test_client()
+
+    response = client.post("/api/invoices/extract", data={"pdf": (BytesIO(b"pdf"), "invoice.pdf")})
+
+    assert response.status_code == 401
+
+
+def test_external_extraction_returns_extracted_data(monkeypatch):
+    monkeypatch.setenv("INVOICE_EXTRACTOR_API_TOKEN", "test-token")
+    client = create_app().test_client()
+
+    with patch("app.routes.extract_pdf", return_value=build_extraction()):
+        response = client.post(
+            "/api/invoices/extract",
+            data={"pdf": (BytesIO(b"pdf"), "invoice.pdf")},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == build_extraction()
+
+
+def test_internal_extraction_returns_the_comparison_input():
+    client = create_app().test_client()
+
+    with patch("app.routes.extract_pdf", return_value=build_extraction()):
+        response = client.post(
+            "/api/invoices/extract-for-comparison",
+            data={"pdf": (BytesIO(b"pdf"), "invoice.pdf")},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json()["comparison_input"] == {
+        "cups": "ES0210002100000000ZN0F",
+        "titular": "Persona Persona",
+        "billing_days": 30,
+        "competitor_invoice_amount": 54.0,
+        "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
+        "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3},
+        "self_consumption_surplus_kwh": None,
+        "meter_rental_eur": 0.81,
+        "vat_rate_percent": 21.0,
+        "electric_tax_rate_percent": 5.11,
     }

@@ -45,9 +45,19 @@ poetry run python run.py
 Endpoints:
 
 - `POST /api/compare`: retorna resum JSON validat.
+- `POST /api/invoices/extract-for-comparison`: rep un `multipart/form-data` amb el camp `pdf` i retorna les dades extretes, junt amb el payload preparat per a la comparativa. Disponible per a la interfície interna.
+- `POST /api/invoices/extract`: API externa protegida. Rep el mateix camp `pdf` i requereix `Authorization: Bearer <INVOICE_EXTRACTOR_API_TOKEN>`.
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
 - `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
 - `GET /api/health`: healthcheck.
+
+Exemple de crida externa:
+
+```bash
+curl -X POST "https://comparativa.example.org/api/invoices/extract" \
+  -H "Authorization: Bearer $INVOICE_EXTRACTOR_API_TOKEN" \
+  -F "pdf=@/ruta/factura.pdf"
+```
 
 ## Frontend
 
@@ -99,6 +109,7 @@ El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu
 | `BACKEND_IMAGE` | `harbor.somenergia.coop/comparativa/comparativa-backend:v0.1.0` | Imatge immutable del backend publicada a Harbor. |
 | `FRONTEND_IMAGE` | `harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0` | Imatge immutable del frontend publicada a Harbor. |
 | `BACKEND_NODE_HOSTNAME` | `moll2` | Node Swarm que conté `/mnt/data/docker/comparativa`. El backend queda fixat a aquest node. |
+| `INVOICE_EXTRACTOR_API_TOKEN` | valor aleatori secret | Token requerit per a l'endpoint extern d'extracció de factures. |
 
 ### Publicar imatges a Harbor
 
