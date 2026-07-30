@@ -731,6 +731,15 @@ def extract_electricity_tax(text: str) -> float | None:
     if m:
         return normalize_number(m.group(1))
 
+    # Factor Energia: "Import IEE N% s/(base)= amount €" reports the final tax amount.
+    m = re.search(
+        rf"import\s+iee\s+\d{{1,3}}(?:[.,]\d+)?\s*%\s+s/\s*\([^)]{{1,80}}\)\s*=\s*(-?{AMOUNT_PATTERN[1:-1]})\s*€",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        return normalize_number(m.group(1))
+
     # Repsol (català/castellà): "Impost elèctric / Impuesto Eléctrico  N,NN €  NNN x N%"
     # L'import és el primer valor numèric de la línia
     m = re.search(
@@ -775,6 +784,25 @@ def extract_electricity_tax_rate(text: str) -> float | None:
     m = re.search(
         r"impuesto\s+electricidad\b[^\n]{0,40}?x\s+(\d{1,3}(?:[.,]\d+)?)\s*%",
         text, re.IGNORECASE,
+    )
+    if m:
+        return round(normalize_number(m.group(1)), 1)
+
+    # Factor Energia: "Import IEE N% s/(base)= amount €" states the applied rate directly.
+    m = re.search(
+        r"import\s+iee\s+(\d{1,3}(?:[.,]\d+)?)\s*%\s+s/\s*\([^)]{1,80}\)\s*=\s*-?\d",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        return round(normalize_number(m.group(1)), 1)
+
+    # Factor Energia: reduced tax notice states the previous rate followed by the applied rate.
+    m = re.search(
+        r"impost\s+especial\s+sobre\s+l['’]electricitat\b.{0,200}?"
+        r"redu[iï]t\s+del\s+\d{1,3}(?:[.,]\d+)?\s*%\s+al\s+(\d{1,3}(?:[.,]\d+)?)\s*%",
+        text,
+        re.IGNORECASE | re.DOTALL,
     )
     if m:
         return round(normalize_number(m.group(1)), 1)

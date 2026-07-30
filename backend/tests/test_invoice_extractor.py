@@ -220,6 +220,18 @@ class ExtractionTests(unittest.TestCase):
         text = "Impost elèctric                          2,34 €  85,23 x 2,74680851%"
         self.assertEqual(extract_electricity_tax_rate(text), 2.7)
 
+    def test_extracts_factor_energia_electricity_tax_rate_from_import_iee(self):
+        text = "Import IEE 0,50000000 % s/(154,09)= 0,77 €"
+        self.assertEqual(extract_electricity_tax_rate(text), 0.5)
+
+    def test_extracts_factor_energia_reduced_electricity_tax_rate(self):
+        text = (
+            "L'impost especial sobre\n"
+            "l'electricitat aplicable a la seva factura es troba reduït del\n"
+            "5,11269632% al 0,500000000%"
+        )
+        self.assertEqual(extract_electricity_tax_rate(text), 0.5)
+
     def test_extracts_endesa_electricity_tax(self):
         text = "Impuesto electricidad ( 190,41 Eur X 5,1 %) .......................................................9,71 €"
         self.assertEqual(extract_electricity_tax(text), 9.71)
@@ -238,6 +250,10 @@ class ExtractionTests(unittest.TestCase):
     def test_extracts_naturgy_electricity_tax(self):
         text = "Impuesto electricidad              364,34 €    x 5,1 %                     18,58 €"
         self.assertEqual(extract_electricity_tax(text), 18.58)
+
+    def test_extracts_factor_energia_electricity_tax_from_import_iee(self):
+        text = "Import IEE 0,50000000 % s/(154,09)= 0,77 €"
+        self.assertEqual(extract_electricity_tax(text), 0.77)
 
     def test_extracts_repsol_catalan_electricity_tax(self):
         text = "Impost elèctric                          2,34 €  85,23 x 2,74680851%"
