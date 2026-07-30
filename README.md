@@ -116,7 +116,7 @@ El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu
 Inicieu sessio al registre i publiqueu les dues imatges amb un tag de versio immutable. El slug del projecte i els noms de repositori s'han de copiar de Harbor; l'script rep les referencies completes per no assumir-ne cap convencio.
 L'script també actualitza el tag mutable `latest`; el stack de Portainer pot usar-lo per a desplegaments automàtics, mentre que els tags immutables de versió serveixen per identificar i recuperar desplegaments anteriors.
 
-Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
+La versió de l'aplicació viu a `VERSION` i s'aplica a les imatges de frontend i backend. Quan la publicació d'ambdues imatges té èxit, l'script crea i puja el tag Git anotat corresponent, com `v0.2.2`. Per evitar etiquetar codi que no correspon a les imatges, exigeix que l'arbre de treball estiga net i que el tag no existisca localment ni a `origin`. Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
 
 ```bash
 export PORTAINER_URL="https://portainer.example.org"
@@ -129,8 +129,8 @@ Amb aquestes variables, `publish-images.sh` conserva el `compose.yml` i les vari
 ```bash
 docker login harbor.somenergia.coop
 ./scripts/publish-images.sh \
-  harbor.somenergia.coop/comparativa/comparativa-backend:v0.1.0 \
-  harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0
+  harbor.somenergia.coop/comparativa/comparativa-backend \
+  harbor.somenergia.coop/comparativa/comparativa-frontend
 ```
 
 Enganxeu `compose.yml` com a Stack a Portainer, afegiu les sis variables i desplegueu-lo. El fitxer esta preparat per Docker Swarm: les etiquetes de Traefik viuen al servei i el backend queda fixat al node indicat per `BACKEND_NODE_HOSTNAME`. Les dades persistents es desen al host sota `/mnt/data/docker/comparativa/`: `config/` conserva les plantilles i la versio publicada, i `assets/` conserva els seus recursos. En el primer arrencada, el backend inicialitza directoris buits amb la configuracio inclosa a la imatge. A cada arrencada, `pricing.json` s'actualitza des de la imatge publicada; les plantilles persistents no se sobreescriuen.

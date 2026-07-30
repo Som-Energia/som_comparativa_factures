@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "webservice-factura-backend"
-version = "0.1.0"
+version = "0.2.2"
 description = "Flask backend for invoice comparison and PDF generation"
 authors = []
 package-mode = false

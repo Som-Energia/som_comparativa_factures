@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 const apiBaseUrl = '/api'
+const appVersion = 'v0.2.2'
 
 const initialForm = {
   cups: '',
@@ -35,7 +36,7 @@ function App() {
   return (
     <main className="page-shell">
       <section className="hero-card">
-        <p className="eyebrow">MVP comparativa</p>
+        <p className="eyebrow">MVP comparativa · {appVersion}</p>
         <h1>Simulacio de factura Som Energia</h1>
         <p className="hero-copy">
           Calcula comparatives i gestiona versions de plantilla PDF sense exposar el shell tècnic.
