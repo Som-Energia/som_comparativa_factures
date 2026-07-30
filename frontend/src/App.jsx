@@ -658,7 +658,7 @@ function TemplateEditorScreen() {
       return
     }
 
-    setEditorErrors({})
+    setEditorErrors(data.validation_error ? { template_version: data.validation_error } : {})
     setVersionStatus(data.status)
     setFiles(data.files)
   }

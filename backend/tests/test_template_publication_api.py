@@ -83,9 +83,26 @@ def test_version_detail_returns_yaml_files(template_store):
     payload = response.get_json()
     assert payload["version"] == "v1"
     assert payload["status"] == "published"
+    assert payload["validation_error"] is None
     assert "meta:" in payload["files"]["content"]
     assert "meta:" in payload["files"]["theme"]
     assert "registry:" in payload["files"]["assets"]
+
+
+def test_version_detail_returns_invalid_yaml_for_editor_recovery(template_store):
+    content_path = template_store / "versions" / "v2" / "content.yaml"
+    content_path.write_text(
+        content_path.read_text(encoding="utf-8").replace("    flux_solar: Flux Solar\n", ""),
+        encoding="utf-8",
+    )
+    client = create_app().test_client()
+
+    response = client.get("/api/templates/comparison/versions/v2")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert "flux_solar" not in payload["files"]["content"]
+    assert payload["validation_error"] == "content.invoice_card.labels no defineix les claus obligatories: flux_solar."
 
 
 def test_create_version_clones_from_existing_version(template_store):

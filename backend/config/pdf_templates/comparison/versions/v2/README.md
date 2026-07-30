@@ -63,6 +63,7 @@ La versio productiva es la indicada a `backend/config/pdf_templates/comparison/p
 | `invoice_card.labels.titular` | string | si | 1-30 caracters |
 | `invoice_card.labels.cups` | string | si | 1-30 caracters |
 | `invoice_card.labels.billing_days` | string | si | 1-30 caracters |
+| `invoice_card.labels.flux_solar` | string | si | 1-30 caracters |
 | `energy_table.title` | string | si | 1-60 caracters |
 | `energy_table.columns.period` | string | si | 1-20 caracters |
 | `energy_table.columns.kwh` | string | si | 1-20 caracters |
