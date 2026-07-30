@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "webservice-factura-backend"
-version = "0.1.0"
+version = "0.2.2"
 description = "Flask backend for invoice comparison and PDF generation"
 authors = []
 package-mode = false
@@ -13,6 +13,7 @@ weasyprint = "62.3"
 pydyf = "0.10.0"
 pyyaml = "^6.0.3"
 gunicorn = "^23.0.0"
+pymupdf = ">=1.24"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"

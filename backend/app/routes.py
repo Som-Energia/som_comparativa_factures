@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import hmac
+import os
 from io import BytesIO
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from flask import Blueprint, Response, jsonify, request, send_file
 
@@ -17,6 +21,7 @@ from .config import (
     update_comparison_template_version_files,
 )
 from .services.calculator import ComparisonInputError, build_comparison_report
+from .services.invoice_extractor import extract_pdf
 from .services.reporting import render_report_html, render_report_html_for_bundle, render_report_pdf
 
 
@@ -58,6 +63,31 @@ def compare():
         return jsonify({"errors": exc.errors}), 400
 
     return jsonify(report)
+
+
+@api.post("/invoices/extract")
+def extract_invoice():
+    authorization_error = _validate_extractor_authorization()
+    if authorization_error is not None:
+        return authorization_error
+
+    extraction = _extract_uploaded_invoice()
+    if isinstance(extraction, tuple):
+        return extraction
+    return jsonify(extraction)
+
+
+@api.post("/invoices/extract-for-comparison")
+def extract_invoice_for_comparison():
+    extraction = _extract_uploaded_invoice()
+    if isinstance(extraction, tuple):
+        return extraction
+    return jsonify(
+        {
+            "extraction": extraction,
+            "comparison_input": _build_comparison_input(extraction),
+        }
+    )
 
 
 @api.post("/reports/comparison.pdf")
@@ -246,6 +276,56 @@ def _extract_template_version(source) -> str | None | Response:
         return response
 
     return template_version
+
+
+def _validate_extractor_authorization() -> Response | None:
+    expected_token = os.environ.get("INVOICE_EXTRACTOR_API_TOKEN")
+    if not expected_token:
+        return jsonify({"errors": {"authorization": "El servei d'extraccio no esta configurat."}}), 503
+
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    if scheme != "Bearer" or not hmac.compare_digest(token, expected_token):
+        return jsonify({"errors": {"authorization": "No autoritzat."}}), 401
+    return None
+
+
+def _extract_uploaded_invoice() -> dict | Response:
+    uploaded_file = request.files.get("pdf")
+    if uploaded_file is None or not uploaded_file.filename:
+        return jsonify({"errors": {"pdf": "Cal adjuntar un PDF al camp 'pdf'."}}), 400
+    if Path(uploaded_file.filename).suffix.casefold() != ".pdf":
+        return jsonify({"errors": {"pdf": "El fitxer ha de tenir extensio .pdf."}}), 415
+
+    temporary_path = None
+    try:
+        with NamedTemporaryFile(suffix=".pdf", delete=False) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            uploaded_file.save(temporary_file)
+        return extract_pdf(temporary_path)
+    except (RuntimeError, ValueError, OSError):
+        return jsonify({"errors": {"pdf": "No s'ha pogut processar el PDF."}}), 422
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def _build_comparison_input(extraction: dict) -> dict:
+    powers = extraction["contracted_powers"]
+    return {
+        "cups": extraction["cups"],
+        "titular": extraction["titular"],
+        "billing_days": extraction["billing_days"],
+        "competitor_invoice_amount": extraction["competitor_invoice_amount"],
+        "energy_by_periods": extraction["energy_by_periods"],
+        "contracted_power_kw_by_periods": {
+            "P1": powers["P1"],
+            "P2": powers["P2"],
+        },
+        "self_consumption_surplus_kwh": extraction["surplus_kwh"],
+        "meter_rental_eur": extraction["meter_rental"],
+        "vat_rate_percent": extraction["vat_rate"],
+        "electric_tax_rate_percent": extraction["electricity_tax_rate"],
+    }
 
 
 def _update_template_publication(*, action: str):

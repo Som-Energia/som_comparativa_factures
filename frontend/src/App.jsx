@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 const apiBaseUrl = '/api'
+const appVersion = 'v0.2.2'
 
 const initialForm = {
   cups: '',
@@ -35,7 +36,7 @@ function App() {
   return (
     <main className="page-shell">
       <section className="hero-card">
-        <p className="eyebrow">MVP comparativa</p>
+        <p className="eyebrow">MVP comparativa · {appVersion}</p>
         <h1>Simulacio de factura Som Energia</h1>
         <p className="hero-copy">
           Calcula comparatives i gestiona versions de plantilla PDF sense exposar el shell tècnic.
@@ -64,6 +65,8 @@ function CompareScreen() {
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [openingHtmlPreview, setOpeningHtmlPreview] = useState(false)
+  const [extractingInvoice, setExtractingInvoice] = useState(false)
+  const [extractionIssues, setExtractionIssues] = useState([])
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }))
@@ -89,6 +92,10 @@ function CompareScreen() {
     }))
   }
 
+  function numberOrEmpty(value) {
+    return value === '' ? '' : Number(value)
+  }
+
   function buildPayload() {
     if (inputMode === 'json') {
       try {
@@ -108,21 +115,21 @@ function CompareScreen() {
     const payload = {
       cups: form.cups,
       titular: form.titular,
-      billing_days: Number(form.billing_days),
-      competitor_invoice_amount: Number(form.competitor_invoice_amount),
+      billing_days: numberOrEmpty(form.billing_days),
+      competitor_invoice_amount: numberOrEmpty(form.competitor_invoice_amount),
       energy_by_periods: {
-        P1: Number(form.energy_by_periods.P1),
-        P2: Number(form.energy_by_periods.P2),
-        P3: Number(form.energy_by_periods.P3),
+        P1: numberOrEmpty(form.energy_by_periods.P1),
+        P2: numberOrEmpty(form.energy_by_periods.P2),
+        P3: numberOrEmpty(form.energy_by_periods.P3),
       },
       contracted_power_kw_by_periods: {
-        P1: Number(form.contracted_power_kw_by_periods.P1),
-        P2: Number(form.contracted_power_kw_by_periods.P2),
+        P1: numberOrEmpty(form.contracted_power_kw_by_periods.P1),
+        P2: numberOrEmpty(form.contracted_power_kw_by_periods.P2),
       },
-      self_consumption_surplus_kwh: Number(form.self_consumption_surplus_kwh),
-      meter_rental_eur: Number(form.meter_rental_eur),
-      vat_rate_percent: Number(form.vat_rate_percent),
-      electric_tax_rate_percent: Number(form.electric_tax_rate_percent),
+      self_consumption_surplus_kwh: numberOrEmpty(form.self_consumption_surplus_kwh),
+      meter_rental_eur: numberOrEmpty(form.meter_rental_eur),
+      vat_rate_percent: numberOrEmpty(form.vat_rate_percent),
+      electric_tax_rate_percent: numberOrEmpty(form.electric_tax_rate_percent),
     }
 
     const templateVersion = form.template_version.trim()
@@ -146,6 +153,54 @@ function CompareScreen() {
     setInputMode(mode)
     setErrors({})
     setPreview(null)
+  }
+
+  async function handleInvoiceUpload(event) {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    setExtractingInvoice(true)
+    setErrors({})
+    setExtractionIssues([])
+    const body = new FormData()
+    body.append('pdf', file)
+
+    const response = await fetch(`${apiBaseUrl}/invoices/extract-for-comparison`, {
+      method: 'POST',
+      body,
+    })
+    const data = await response.json()
+    setExtractingInvoice(false)
+
+    if (!response.ok) {
+      setErrors(data.errors || {})
+      return
+    }
+
+    const input = data.comparison_input
+    setForm((current) => ({
+      ...current,
+      cups: input.cups ?? '',
+      titular: input.titular ?? '',
+      billing_days: input.billing_days ?? '',
+      competitor_invoice_amount: input.competitor_invoice_amount ?? '',
+      energy_by_periods: {
+        P1: input.energy_by_periods.P1 ?? '',
+        P2: input.energy_by_periods.P2 ?? '',
+        P3: input.energy_by_periods.P3 ?? '',
+      },
+      contracted_power_kw_by_periods: {
+        P1: input.contracted_power_kw_by_periods.P1 ?? '',
+        P2: input.contracted_power_kw_by_periods.P2 ?? '',
+      },
+      self_consumption_surplus_kwh: input.self_consumption_surplus_kwh ?? '',
+      meter_rental_eur: input.meter_rental_eur ?? '',
+      vat_rate_percent: input.vat_rate_percent ?? '',
+      electric_tax_rate_percent: input.electric_tax_rate_percent ?? '',
+    }))
+    setExtractionIssues(data.extraction.data_quality.issues)
   }
 
   async function handlePreview(event) {
@@ -256,6 +311,19 @@ function CompareScreen() {
 
         {inputMode === 'form' ? (
           <>
+        <section className="form-section">
+          <h2>Carregar factura PDF</h2>
+          <p className="section-copy">Les dades extretes ompliran el formulari i podreu revisar-les abans de calcular.</p>
+          <label>
+            Factura PDF
+            <input type="file" accept="application/pdf,.pdf" onChange={handleInvoiceUpload} disabled={extractingInvoice} />
+            <FieldError error={errors.pdf} />
+          </label>
+          {extractingInvoice && <p className="field-help">Extraient dades de la factura...</p>}
+          {extractionIssues.length > 0 && (
+            <p className="field-help">Hi ha camps que cal revisar abans de calcular: {extractionIssues.map((issue) => issue.field).join(', ')}.</p>
+          )}
+        </section>
         <section className="form-section">
           <h2>Titular i contracte</h2>
           <label>

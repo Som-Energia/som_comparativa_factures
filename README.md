@@ -45,9 +45,19 @@ poetry run python run.py
 Endpoints:
 
 - `POST /api/compare`: retorna resum JSON validat.
+- `POST /api/invoices/extract-for-comparison`: rep un `multipart/form-data` amb el camp `pdf` i retorna les dades extretes, junt amb el payload preparat per a la comparativa. Disponible per a la interfície interna.
+- `POST /api/invoices/extract`: API externa protegida. Rep el mateix camp `pdf` i requereix `Authorization: Bearer <INVOICE_EXTRACTOR_API_TOKEN>`.
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
 - `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
 - `GET /api/health`: healthcheck.
+
+Exemple de crida externa:
+
+```bash
+curl -X POST "https://comparativa.example.org/api/invoices/extract" \
+  -H "Authorization: Bearer $INVOICE_EXTRACTOR_API_TOKEN" \
+  -F "pdf=@/ruta/factura.pdf"
+```
 
 ## Frontend
 
@@ -99,13 +109,14 @@ El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu
 | `BACKEND_IMAGE` | `harbor.somenergia.coop/comparativa/comparativa-backend:v0.1.0` | Imatge immutable del backend publicada a Harbor. |
 | `FRONTEND_IMAGE` | `harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0` | Imatge immutable del frontend publicada a Harbor. |
 | `BACKEND_NODE_HOSTNAME` | `moll2` | Node Swarm que conté `/mnt/data/docker/comparativa`. El backend queda fixat a aquest node. |
+| `INVOICE_EXTRACTOR_API_TOKEN` | valor aleatori secret | Token requerit per a l'endpoint extern d'extracció de factures. |
 
 ### Publicar imatges a Harbor
 
 Inicieu sessio al registre i publiqueu les dues imatges amb un tag de versio immutable. El slug del projecte i els noms de repositori s'han de copiar de Harbor; l'script rep les referencies completes per no assumir-ne cap convencio.
 L'script també actualitza el tag mutable `latest`; el stack de Portainer pot usar-lo per a desplegaments automàtics, mentre que els tags immutables de versió serveixen per identificar i recuperar desplegaments anteriors.
 
-Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
+La versió de l'aplicació viu a `VERSION` i s'aplica a les imatges de frontend i backend. Quan la publicació d'ambdues imatges té èxit, l'script crea i puja el tag Git anotat corresponent, com `v0.2.2`. Per evitar etiquetar codi que no correspon a les imatges, exigeix que l'arbre de treball estiga net i que el tag no existisca localment ni a `origin`. Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
 
 ```bash
 export PORTAINER_URL="https://portainer.example.org"
@@ -118,8 +129,8 @@ Amb aquestes variables, `publish-images.sh` conserva el `compose.yml` i les vari
 ```bash
 docker login harbor.somenergia.coop
 ./scripts/publish-images.sh \
-  harbor.somenergia.coop/comparativa/comparativa-backend:v0.1.0 \
-  harbor.somenergia.coop/comparativa/comparativa-frontend:v0.1.0
+  harbor.somenergia.coop/comparativa/comparativa-backend \
+  harbor.somenergia.coop/comparativa/comparativa-frontend
 ```
 
 Enganxeu `compose.yml` com a Stack a Portainer, afegiu les sis variables i desplegueu-lo. El fitxer esta preparat per Docker Swarm: les etiquetes de Traefik viuen al servei i el backend queda fixat al node indicat per `BACKEND_NODE_HOSTNAME`. Les dades persistents es desen al host sota `/mnt/data/docker/comparativa/`: `config/` conserva les plantilles i la versio publicada, i `assets/` conserva els seus recursos. En el primer arrencada, el backend inicialitza directoris buits amb la configuracio inclosa a la imatge. A cada arrencada, `pricing.json` s'actualitza des de la imatge publicada; les plantilles persistents no se sobreescriuen.
