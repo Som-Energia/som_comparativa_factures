@@ -129,6 +129,8 @@ def test_compare_limits_total_to_zero_and_returns_flux_solar():
     body = response.get_json()
     assert body["comparison"]["som_total"] == 0.0
     assert body["breakdown"]["flux_solar_kwh"] == 5.33
+    assert body["breakdown"]["non_compensated_surplus_eur"] == 0.16
+    assert body["breakdown"]["flux_solar_eur"] == 0.13
 
 
 def test_compare_rejects_negative_billing_values_and_invalid_percentages():

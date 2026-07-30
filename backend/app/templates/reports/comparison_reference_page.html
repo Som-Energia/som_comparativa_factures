@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      @font-face { font-family: Outfit; src: url("reference/Outfit-regular.ttf"); font-weight: 400; }
+      @font-face { font-family: Outfit; src: url("reference/OutfitSemiBold-regular.ttf"); font-weight: 600; }
+      @font-face { font-family: Outfit; src: url("reference/Outfit-bold.ttf"); font-weight: 700; }
+      @page { size: A4; margin: 0; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #e9eee6; color: #093b3f; font-family: Outfit, Arial, sans-serif; font-size: 16px; }
+      .page { height: 297mm; padding: 22mm 21mm 15mm; position: relative; }
+      h1, h2, h3, p { margin: 0; }
+      h1 { color: #434343; font-size: 20px; line-height: 1.2; font-weight: 600; }
+      h2 { color: #434343; font-size: 20px; line-height: 1.2; font-weight: 600; }
+      h3 { color: #434343; font-size: 17.33px; line-height: 1.2; font-weight: 700; }
+      .summary { margin: 8px auto 47px; width: 84%; text-align: center; }
+      .summary table { border-collapse: collapse; width: 100%; font-size: 16px; }
+      .summary th { background: #aaaee1; color: #075340; font-size: 16px; font-weight: 700; padding: 3px 7px; }
+      .summary td { color: #075340; font-size: 16px; padding: 3px 7px 5px; }
+      .tariff { background: #aaaee1; color: #075340; font-size: 14.65px; line-height: 1.55; padding: 3px 8px; }
+      .section-title { margin-bottom: 26px; }
+      .identity { display: grid; grid-template-columns: 34% 66%; row-gap: 5px; font-size: 16px; margin: 0 0 22px 1px; }
+      .identity strong { font-weight: 700; }
+      .invoice-title { text-align: center; margin-bottom: 6px; }
+      .invoice { --caption-row: 22px; --period-row: 24px; --data-row: 30px; display: grid; grid-template-columns: 1fr 178px; column-gap: 16px; font-size: 16px; }
+      .invoice-labels { display: grid; grid-template-rows: var(--caption-row) var(--period-row) repeat(2, var(--data-row)) 31px 31px 31px 31px; }
+      .invoice-labels span { align-self: center; padding-left: 1px; }
+      .invoice-labels .spacer { visibility: hidden; }
+      .periods { border-collapse: collapse; color: #4b4b4b; table-layout: fixed; text-align: center; width: 178px; }
+      .periods caption { height: var(--caption-row); font-size: 16px; font-style: italic; }
+      .periods th { font-style: italic; font-weight: 400; height: var(--period-row); padding: 0 2px 3px; }
+      .periods .data-row td { border: 1px solid #313131; height: var(--data-row); padding: 3px 2px; }
+      .periods .single td { height: 31px; padding: 5px 0 0; text-align: right; }
+      .cost-title { margin: 25px 0 7px; text-align: center; font-size: 16px; }
+      .costs { border-collapse: collapse; width: 100%; font-size: 16px; }
+      .costs td { padding: 3px 3px; line-height: 1.12; }
+      .costs .rate { text-align: right; width: 12%; }
+      .costs .amount { background: #c9ff5d; text-align: right; width: 20%; padding-right: 4px; color: #111; }
+      .costs .total td { background: #08383c; color: white; font-weight: 700; font-size: 16px; padding: 3px 4px; }
+      .costs .total td:first-child { text-align: right; }
+      .costs .total td:last-child { text-align: right; }
+      .flux { margin-top: 15px; color: #454545; font-size: 16px; line-height: 1.45; }
+      .flux p { display: grid; grid-template-columns: 1fr 70px; column-gap: 8px; margin-bottom: 2px; }
+      .flux .amount { text-align: right; }
+      a { color: #08383c; text-decoration: underline; }
+      .flux a { font-weight: 400; }
+      .notice { color: #171717; font-size: 14.65px; line-height: 1.45; margin-top: 26px; }
+      .footer { bottom: 10mm; color: #173f42; font-size: 13.33px; left: 21mm; position: absolute; right: 21mm; }
+      .footer .number { float: right; font-size: 20px; }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <h1>Simulació de cost de la factura</h1>
+      <div class="summary">
+        <table>
+          <thead><tr><th>Cost actual</th><th>Cost amb Som Energia</th><th>{{ report.comparison.savings_label }}</th></tr></thead>
+          <tbody><tr><td>{{ euro(report.comparison.competitor_total) }}</td><td>{{ euro(report.comparison.som_total) }}</td><td>{{ euro(report.comparison.savings) }}</td></tr></tbody>
+        </table>
+        <div class="tariff">Cost calculat amb la tarifa {{ report.pricing.tariff_name }}<br>Preus vigents a partir de l'{{ effective_date }}</div>
+      </div>
+
+      <h2 class="section-title">Detall de la simulació de la teva factura amb Som Energia</h2>
+      <div class="identity"><strong>Titular:</strong><strong>{{ report.customer.titular }}</strong><strong>CUPS:</strong><strong>{{ report.customer.cups }}</strong></div>
+
+      <h3 class="invoice-title">Dades de la factura</h3>
+      <div class="invoice">
+        <div class="invoice-labels">
+          <span class="spacer">.</span><span class="spacer">.</span><span>Potències contractades (kW)</span><span>Energia utilitzada (kWh)</span><span>Excedents d'autoconsum (kWh)</span><span>Serveis d'ajust en línia a part (€)</span><span>Lloguer del comptador (€)</span><span>Dies del període facturat</span>
+        </div>
+        <table class="periods">
+          <caption>Períodes tarifaris</caption>
+          <thead><tr><th>P1</th><th>P2</th><th>P3</th></tr></thead>
+          <tbody>
+            <tr class="data-row"><td>{{ "%.2f"|format(report.input.contracted_power_kw_by_periods.P1)|replace('.', ',') }}</td><td>{{ "%.2f"|format(report.input.contracted_power_kw_by_periods.P2)|replace('.', ',') }}</td><td></td></tr>
+            <tr class="data-row"><td>{{ "%.2f"|format(report.input.energy_by_periods.P1)|replace('.', ',') }}</td><td>{{ "%.2f"|format(report.input.energy_by_periods.P2)|replace('.', ',') }}</td><td>{{ "%.2f"|format(report.input.energy_by_periods.P3)|replace('.', ',') }}</td></tr>
+            <tr class="single"><td colspan="3">{{ "%.3f"|format(report.input.self_consumption_surplus_kwh)|replace('.', ',') }}</td></tr>
+            <tr class="single"><td colspan="3">&nbsp;</td></tr>
+            <tr class="single"><td colspan="3">{{ euro(report.input.meter_rental_eur) }}</td></tr>
+            <tr class="single"><td colspan="3">{{ report.input.billing_days }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="cost-title">Cost calculat amb la tarifa {{ report.pricing.tariff_name }}</h3>
+      <table class="costs">
+        <tr><td>Cost per la potència contractada</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.power_eur) }}</td></tr>
+        <tr><td>Cost per l'energia utilitzada</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.energy_eur) }}</td></tr>
+        <tr><td>Compensació d'excedents</td><td class="rate"></td><td class="amount">{{ euro(-report.breakdown.costs.surplus_compensation_eur) }}</td></tr>
+        <tr><td>Cost Serveis d'Ajust</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.adjustment_services_eur) }}</td></tr>
+        <tr><td>Bo Social</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.social_bonus_eur) }}</td></tr>
+        <tr><td>Impost elèctric</td><td class="rate">{{ "%.2f"|format(report.input.electric_tax_rate_percent)|replace('.', ',') }}%</td><td class="amount">{{ euro(report.breakdown.costs.electric_tax_eur) }}</td></tr>
+        <tr><td>Cost del lloguer del comptador</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.meter_rental_eur) }}</td></tr>
+        <tr><td>IVA</td><td class="rate">{{ "%.0f"|format(report.input.vat_rate_percent) }}%</td><td class="amount">{{ euro(report.breakdown.costs.vat_eur) }}</td></tr>
+        <tr class="total"><td colspan="2">Total</td><td>{{ euro(report.comparison.som_total) }}</td></tr>
+      </table>
+
+      <div class="flux">
+        <p><span><strong>Import dels <a href="https://ca.support.somenergia.coop/article/1397-que-son-els-excedents-no-compensats">excedents no compensats</a></strong> (ajust límit de compensació)</span><span class="amount">{{ euro(report.breakdown.non_compensated_surplus_eur) }}</span></p>
+        <p><span><strong>Sols (€) acumulats al <a href="https://ca.support.somenergia.coop/article/1371-que-es-el-flux-solar">Flux Solar</a></strong>: el 80% de l'import dels excedents no compensats. Es descomptarà a les següents factures.</span><span class="amount">{{ euro(report.breakdown.flux_solar_eur) }}</span></p>
+      </div>
+      <p class="notice">Aquesta simulació només és vàlida per aquesta factura i el resultat no és extrapolable a una altra factura ni tampoc al cost anual de la llum.</p>
+      <footer class="footer">Simulació factura Som Energia <span class="number">3</span></footer>
+    </main>
+  </body>
+</html>

@@ -6,13 +6,17 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from flask import render_template
+import fitz
 from weasyprint import HTML
 
-from app.config import resolve_comparison_template_bundle
+from app.config import ASSETS_DIR, TemplateResolutionError, resolve_comparison_template_bundle
 
 
 def render_report_pdf(report: dict, template_version: str | None = None) -> bytes:
     template_bundle = resolve_comparison_template_bundle(version=template_version)
+    if template_bundle.version == "v3":
+        return _render_reference_report_pdf(report, template_bundle)
+
     html = _render_report_html(report, template_bundle, asset_mode="pdf")
     return HTML(string=html, base_url=template_bundle.assets_dir.as_uri()).write_pdf()
 
@@ -23,6 +27,9 @@ def render_report_html(report: dict, template_version: str | None = None) -> str
 
 
 def render_report_html_for_bundle(report: dict, template_bundle) -> str:
+    if template_bundle.version == "v3":
+        return _render_reference_simulation_html(report, template_bundle)
+
     return _render_report_html(report, template_bundle, asset_mode="html")
 
 
@@ -42,6 +49,45 @@ def _render_report_html(report: dict, template_bundle, *, asset_mode: str) -> st
         euro=euro,
         template_bundle=template_bundle,
     )
+
+
+def _render_reference_report_pdf(report: dict, template_bundle) -> bytes:
+    reference_pdf = _reference_pdf_path()
+    simulation_html = _render_reference_simulation_html(report, template_bundle)
+    simulation_pdf = HTML(string=simulation_html, base_url=template_bundle.assets_dir.as_uri()).write_pdf()
+
+    document = fitz.open(reference_pdf)
+    replacement_page = fitz.open(stream=simulation_pdf, filetype="pdf")
+    document.delete_page(2)
+    document.insert_pdf(replacement_page, from_page=0, to_page=0, start_at=2)
+    return document.tobytes(garbage=4, deflate=True)
+
+
+def _render_reference_simulation_html(report: dict, template_bundle) -> str:
+    return render_template(
+        "reports/comparison_reference_page.html",
+        report=report,
+        euro=euro,
+        effective_date=_format_effective_date(report["pricing"]["effective_date"]),
+    )
+
+
+def _reference_pdf_path() -> Path:
+    deployed_path = ASSETS_DIR / "reference" / "comparison-v3.pdf"
+    if deployed_path.is_file():
+        return deployed_path
+
+    # Running the backend directly from the checkout uses the tracked design source.
+    checkout_path = Path(__file__).resolve().parents[3] / "assets" / "CA_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf"
+    if checkout_path.is_file():
+        return checkout_path
+
+    raise TemplateResolutionError("No s'ha trobat el PDF mestre de la plantilla de comparativa v3.")
+
+
+def _format_effective_date(value: str) -> str:
+    year, month, day = value.split("-")
+    return f"{int(day)} de maig de {year}" if month == "05" else f"{int(day)}/{int(month)}/{year}"
 
 
 def _resolve_template_content(content: dict, report: dict) -> dict:

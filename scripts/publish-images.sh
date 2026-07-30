@@ -59,7 +59,7 @@ frontend_image="$frontend_repository:$version"
 backend_latest_image="$backend_repository:latest"
 frontend_latest_image="$frontend_repository:latest"
 
-docker build --pull --tag "$backend_image" --tag "$backend_latest_image" "$project_dir/backend"
+docker build --pull --file "$project_dir/backend/Dockerfile" --tag "$backend_image" --tag "$backend_latest_image" "$project_dir"
 docker push "$backend_image"
 docker push "$backend_latest_image"
 docker build --pull --tag "$frontend_image" --tag "$frontend_latest_image" "$project_dir/frontend"

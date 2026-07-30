@@ -17,4 +17,9 @@ if [ ! -d /app/assets/pdf_templates ]; then
     cp -a /seed-assets/. /app/assets/
 fi
 
+if [ ! -f /app/assets/reference/comparison-v3.pdf ]; then
+    mkdir -p /app/assets/reference
+    cp -a /seed-reference/reference/. /app/assets/reference/
+fi
+
 exec "$@"

@@ -68,6 +68,7 @@ def test_versions_endpoint_lists_statuses(template_store):
         "published_version": "v1",
         "versions": [
             {"version": "v99", "status": "draft"},
+            {"version": "v3", "status": "draft"},
             {"version": "v2", "status": "draft"},
             {"version": "v1", "status": "published"},
         ],
