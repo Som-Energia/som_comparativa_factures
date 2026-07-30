@@ -113,17 +113,108 @@ def list_comparison_template_versions() -> list[TemplateVersionInfo]:
 
 
 def get_comparison_template_version_files(version: str) -> dict[str, Any]:
-    bundle = _resolve_template_bundle("comparison", version=version)
-    status = _get_template_version_status(bundle.version)
-    return {
-        "version": bundle.version,
-        "status": status,
-        "files": {
-            "content": bundle.content_path.read_text(encoding="utf-8"),
-            "theme": bundle.theme_path.read_text(encoding="utf-8"),
-            "assets": bundle.assets_manifest_path.read_text(encoding="utf-8"),
-        },
+    resolved_version = _parse_template_version(version)
+    version_dir = PDF_TEMPLATES_DIR / "comparison" / "versions" / resolved_version
+    file_paths = {
+        "content": version_dir / "content.yaml",
+        "theme": version_dir / "theme.yaml",
+        "assets": version_dir / "assets.yaml",
     }
+    missing_files = [_describe_path(path) for path in file_paths.values() if not path.is_file()]
+    if missing_files:
+        raise TemplateResolutionError(
+            f"La versio '{resolved_version}' del template 'comparison' esta incompleta: {', '.join(missing_files)}."
+        )
+
+    validation_error = None
+    try:
+        _resolve_template_bundle("comparison", version=resolved_version)
+    except (TemplateResolutionError, TemplateValidationError) as exc:
+        validation_error = str(exc)
+
+    return {
+        "version": resolved_version,
+        "status": _get_template_version_status(resolved_version),
+        "validation_error": validation_error,
+        "files": {name: path.read_text(encoding="utf-8") for name, path in file_paths.items()},
+    }
+
+
+def migrate_comparison_template_schema() -> list[str]:
+    """Apply backwards-compatible data migrations to persisted template files."""
+    versions_dir = PDF_TEMPLATES_DIR / "comparison" / "versions"
+    if not versions_dir.is_dir():
+        return []
+
+    migrated_versions = []
+    for version_dir in versions_dir.iterdir():
+        if not version_dir.is_dir():
+            continue
+
+        content_path = version_dir / "content.yaml"
+        if not content_path.is_file():
+            continue
+
+        migrated_content = _add_missing_flux_solar_label(content_path.read_text(encoding="utf-8"))
+        if migrated_content is None:
+            continue
+
+        _write_text_atomic(content_path, migrated_content)
+        migrated_versions.append(version_dir.name)
+
+    return migrated_versions
+
+
+def _add_missing_flux_solar_label(content: str) -> str | None:
+    try:
+        payload = _load_yaml_string(content, "content.yaml")
+    except TemplateValidationError:
+        return None
+
+    invoice_card = payload.get("invoice_card")
+    labels = invoice_card.get("labels") if isinstance(invoice_card, dict) else None
+    if not isinstance(labels, dict) or "flux_solar" in labels:
+        return None
+
+    lines = content.splitlines(keepends=True)
+    invoice_card_indent = None
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)invoice_card:\s*(?:#.*)?$", line.rstrip("\n"))
+        if match:
+            invoice_card_indent = len(match.group(1))
+            continue
+
+        if invoice_card_indent is None:
+            continue
+
+        line_indent = len(line) - len(line.lstrip())
+        if line.strip() and line_indent <= invoice_card_indent:
+            break
+
+        match = re.match(r"^(\s*)labels:\s*(?:#.*)?$", line.rstrip("\n"))
+        if not match:
+            continue
+
+        labels_indent = len(match.group(1))
+        insert_at = index + 1
+        while insert_at < len(lines):
+            candidate = lines[insert_at]
+            candidate_indent = len(candidate) - len(candidate.lstrip())
+            if candidate.strip() and candidate_indent <= labels_indent:
+                break
+            if candidate.strip():
+                insert_at += 1
+                continue
+            next_line_index = insert_at + 1
+            while next_line_index < len(lines) and not lines[next_line_index].strip():
+                next_line_index += 1
+            if next_line_index == len(lines) or len(lines[next_line_index]) - len(lines[next_line_index].lstrip()) <= labels_indent:
+                break
+            insert_at += 1
+        lines.insert(insert_at, f"{' ' * (labels_indent + 2)}flux_solar: Flux Solar\n")
+        return "".join(lines)
+
+    return None
 
 
 def create_comparison_template_version(*, source_version: str, target_version: str) -> dict[str, Any]:

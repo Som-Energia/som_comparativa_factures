@@ -6,6 +6,7 @@ from app.config import (
     TemplateResolutionError,
     TemplateValidationError,
     get_published_comparison_template_version,
+    migrate_comparison_template_schema,
     publish_comparison_template_version,
     resolve_comparison_template_bundle,
     rollback_comparison_template_version,
@@ -84,3 +85,18 @@ def test_malformed_published_json_is_rejected(template_store):
 
     with pytest.raises(TemplateResolutionError):
         resolve_comparison_template_bundle()
+
+
+def test_migration_adds_missing_flux_solar_label_without_changing_other_content(template_store):
+    content_path = template_store / "versions" / "v1" / "content.yaml"
+    original_content = content_path.read_text(encoding="utf-8")
+    content_path.write_text(
+        original_content.replace("    flux_solar: Flux Solar\n", ""),
+        encoding="utf-8",
+    )
+
+    assert migrate_comparison_template_schema() == ["v1"]
+    assert content_path.read_text(encoding="utf-8") == original_content
+    assert migrate_comparison_template_schema() == []
+
+    assert resolve_comparison_template_bundle("v1").version == "v1"
