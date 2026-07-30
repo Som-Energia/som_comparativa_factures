@@ -36,12 +36,12 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(result["billing_days"], 30)
         self.assertEqual(result["competitor_invoice_amount"], 54.0)
         self.assertEqual(result["energy_by_periods"], {"P1": 34.41, "P2": 41.55, "P3": 88.63})
-        self.assertEqual(result["contracted_powers"], {"P1": 3.45, "P2": 3.45, "P3": 3.45})
-        self.assertEqual(result["meter_rental"], 0.25)
+        self.assertEqual(result["contracted_power_kw_by_periods"], {"P1": 3.45, "P2": 3.45, "P3": 3.45})
+        self.assertEqual(result["meter_rental_eur"], 0.25)
         self.assertEqual(result["vat_amount"], 11.34)
-        self.assertEqual(result["vat_rate"], 21.0)
+        self.assertEqual(result["vat_rate_percent"], 21.0)
         self.assertEqual(result["electricity_tax"], 1.35)
-        self.assertEqual(result["electricity_tax_rate"], 2.5)
+        self.assertEqual(result["electric_tax_rate_percent"], 2.5)
         self.assertEqual(result["data_quality"]["status"], "verified")
 
     def test_prefers_retailer_from_the_top_left_header(self):

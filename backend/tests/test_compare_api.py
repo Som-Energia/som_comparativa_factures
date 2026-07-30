@@ -166,13 +166,13 @@ def build_extraction():
         "billing_days": 30,
         "competitor_invoice_amount": 54.0,
         "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
-        "contracted_powers": {"P1": 2.3, "P2": 2.3, "P3": 2.3},
-        "meter_rental": 0.81,
+        "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3, "P3": 2.3},
+        "meter_rental_eur": 0.81,
         "vat_amount": 11.34,
-        "vat_rate": 21.0,
+        "vat_rate_percent": 21.0,
         "electricity_tax": 1.35,
-        "electricity_tax_rate": 5.11,
-        "surplus_kwh": None,
+        "electric_tax_rate_percent": 5.11,
+        "self_consumption_surplus_kwh": None,
         "data_quality": {"status": "needs_review", "issues": []},
     }
 

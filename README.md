@@ -10,7 +10,7 @@ MVP per generar una comparativa de factura amb Som Energia a partir d'un formula
 - `backend/config/pdf_templates/comparison/published.json`: punter de la versio activa del template.
 - `backend/config/pdf_templates/comparison/versions/v1/`: contracte editable de `content.yaml`, `theme.yaml` i `assets.yaml`.
 
-## Contracte minim d'entrada
+## Contracte minim d'entrada de comparativa
 
 ```json
 {
@@ -46,7 +46,7 @@ Endpoints:
 
 - `POST /api/compare`: retorna resum JSON validat.
 - `POST /api/invoices/extract-for-comparison`: rep un `multipart/form-data` amb el camp `pdf` i retorna les dades extretes, junt amb el payload preparat per a la comparativa. Disponible per a la interfície interna.
-- `POST /api/invoices/extract`: API externa protegida. Rep el mateix camp `pdf` i requereix `Authorization: Bearer <INVOICE_EXTRACTOR_API_TOKEN>`.
+- `POST /api/invoices/extract`: API externa protegida. Rep el mateix camp `pdf`, requereix `Authorization: Bearer <INVOICE_EXTRACTOR_API_TOKEN>` i retorna les dades extretes amb les claus del contracte de comparativa.
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
 - `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
 - `GET /api/health`: healthcheck.
@@ -58,6 +58,29 @@ curl -X POST "https://comparativa.example.org/api/invoices/extract" \
   -H "Authorization: Bearer $INVOICE_EXTRACTOR_API_TOKEN" \
   -F "pdf=@/ruta/factura.pdf"
 ```
+
+La resposta inclou les claus del contracte d'entrada de comparativa i conserva dades addicionals que poden ser útils per revisar l'extracció:
+
+```json
+{
+  "retailer": "Iberdrola",
+  "cups": "ES0210002100000000ZN0F",
+  "titular": "Persona Persona",
+  "billing_days": 30,
+  "competitor_invoice_amount": 54.0,
+  "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
+  "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3, "P3": 2.3},
+  "self_consumption_surplus_kwh": null,
+  "meter_rental_eur": 0.81,
+  "vat_amount": 11.34,
+  "vat_rate_percent": 21.0,
+  "electricity_tax": 1.35,
+  "electric_tax_rate_percent": 5.11,
+  "data_quality": {"status": "verified", "issues": []}
+}
+```
+
+`POST /api/invoices/extract-for-comparison` retorna aquest objecte dins d'`extraction` i afegeix `comparison_input`, preparat per enviar directament a `POST /api/compare`. Aquest últim conserva únicament P1 i P2 de la potència contractada, perquè són els períodes que admet el càlcul actual.
 
 ## Frontend
 
