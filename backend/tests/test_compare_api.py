@@ -20,6 +20,7 @@ def build_payload(**overrides):
             "P2": 2.3,
         },
         "self_consumption_surplus_kwh": 0,
+        "adjustment_service_eur_per_kwh": 0,
         "meter_rental_eur": 0.81,
         "vat_rate_percent": 21,
         "electric_tax_rate_percent": 5.11,
@@ -52,6 +53,15 @@ def test_compare_returns_report_summary_for_valid_payload():
         "amount": 41.67,
         "is_total": True,
     }
+
+
+def test_comparison_input_defaults_returns_adjustment_service_price():
+    client = create_app().test_client()
+
+    response = client.get("/api/comparison-input-defaults")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"adjustment_service_eur_per_kwh": 0.019}
 
 
 def test_compare_returns_validation_errors_for_invalid_payload():
@@ -108,6 +118,45 @@ def test_compare_applies_surplus_compensation_beyond_energy_cost():
     assert body["breakdown"]["flux_solar_kwh"] == 0.0
 
 
+def test_compare_adds_adjustment_service_to_the_taxable_subtotal():
+    app = create_app()
+    client = app.test_client()
+
+    base_response = client.post(
+        "/api/compare",
+        json=build_payload(
+            billing_days=1,
+            energy_by_periods={"P1": 100, "P2": 0, "P3": 0},
+            contracted_power_kw_by_periods={"P1": 0, "P2": 0},
+            meter_rental_eur=0,
+            vat_rate_percent=21,
+            electric_tax_rate_percent=5,
+        ),
+    )
+    response = client.post(
+        "/api/compare",
+        json=build_payload(
+            billing_days=1,
+            energy_by_periods={"P1": 100, "P2": 0, "P3": 0},
+            contracted_power_kw_by_periods={"P1": 0, "P2": 0},
+            adjustment_service_eur_per_kwh=0.01,
+            meter_rental_eur=0,
+            vat_rate_percent=21,
+            electric_tax_rate_percent=5,
+        ),
+    )
+
+    assert base_response.status_code == 200
+    assert response.status_code == 200
+    base = base_response.get_json()
+    body = response.get_json()
+    assert body["input"]["adjustment_service_eur_per_kwh"] == 0.01
+    assert body["breakdown"]["costs"]["adjustment_services_eur"] == 1.0
+    assert round(body["breakdown"]["costs"]["electric_tax_eur"] - base["breakdown"]["costs"]["electric_tax_eur"], 2) == 0.05
+    assert round(body["breakdown"]["costs"]["vat_eur"] - base["breakdown"]["costs"]["vat_eur"], 2) == 0.22
+    assert round(body["comparison"]["som_total"] - base["comparison"]["som_total"], 2) == 1.27
+
+
 def test_compare_limits_total_to_zero_and_returns_flux_solar():
     app = create_app()
     client = app.test_client()
@@ -142,6 +191,7 @@ def test_compare_rejects_negative_billing_values_and_invalid_percentages():
         json=build_payload(
             contracted_power_kw_by_periods={"P1": -1, "P2": 1},
             self_consumption_surplus_kwh=-1,
+            adjustment_service_eur_per_kwh=-1,
             meter_rental_eur=-1,
             vat_rate_percent=101,
             electric_tax_rate_percent=-1,
@@ -151,6 +201,7 @@ def test_compare_rejects_negative_billing_values_and_invalid_percentages():
     assert response.status_code == 400
     assert response.get_json()["errors"] == {
         "contracted_power_kw_by_periods.P1": "La potència contractada del període P1 ha de ser positiva o zero.",
+        "adjustment_service_eur_per_kwh": "El servei d'ajust per kWh ha de ser positiu o zero.",
         "electric_tax_rate_percent": "El tipus d'impost elèctric ha de ser entre 0 i 100.",
         "meter_rental_eur": "El lloguer del comptador ha de ser positiu o zero.",
         "self_consumption_surplus_kwh": "Els excedents d'autoconsum han de ser positius o zero.",

@@ -16,6 +16,7 @@ def _payload():
         "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
         "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3},
         "self_consumption_surplus_kwh": 2000,
+        "adjustment_service_eur_per_kwh": 0.02,
         "meter_rental_eur": 0.81,
         "vat_rate_percent": 21,
         "electric_tax_rate_percent": 5.11,
@@ -39,8 +40,9 @@ def test_reference_template_pdf_preserves_static_pages_and_renders_calculation_p
     assert "Persona de prova" in calculation_text
     assert "ES0210002100000000ZN0F" in calculation_text
     assert "Cost per l'energia utilitzada" in calculation_text
+    assert "3,29 €" in calculation_text
     assert "Sols (€) acumulats al Flux Solar" in calculation_text
-    assert "21,78 €" in calculation_text
+    assert "19,15 €" in calculation_text
 
     links = calculation_page.get_links()
     assert {link["uri"] for link in links} == {

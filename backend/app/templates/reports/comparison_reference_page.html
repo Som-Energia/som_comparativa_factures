@@ -76,7 +76,7 @@
             <tr class="data-row"><td>{{ "%.2f"|format(report.input.contracted_power_kw_by_periods.P1)|replace('.', ',') }}</td><td>{{ "%.2f"|format(report.input.contracted_power_kw_by_periods.P2)|replace('.', ',') }}</td><td></td></tr>
             <tr class="data-row"><td>{{ "%.2f"|format(report.input.energy_by_periods.P1)|replace('.', ',') }}</td><td>{{ "%.2f"|format(report.input.energy_by_periods.P2)|replace('.', ',') }}</td><td>{{ "%.2f"|format(report.input.energy_by_periods.P3)|replace('.', ',') }}</td></tr>
             <tr class="single"><td colspan="3">{{ "%.3f"|format(report.input.self_consumption_surplus_kwh)|replace('.', ',') }}</td></tr>
-            <tr class="single"><td colspan="3">&nbsp;</td></tr>
+            <tr class="single"><td colspan="3">{{ euro(report.breakdown.costs.adjustment_services_eur) }}</td></tr>
             <tr class="single"><td colspan="3">{{ euro(report.input.meter_rental_eur) }}</td></tr>
             <tr class="single"><td colspan="3">{{ report.input.billing_days }}</td></tr>
           </tbody>
