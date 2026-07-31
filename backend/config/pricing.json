@@ -15,6 +15,6 @@
   "adjustment_service_eur_per_kwh": 0.019,
   "social_bonus_eur_per_day": 0.024688,
   "meter_rental_eur": 0.81,
-  "electric_tax_rate": 0.0511,
+  "electric_tax_rate": 0.0511269632,
   "vat_rate": 0.21
 }
