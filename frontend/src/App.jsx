@@ -516,7 +516,7 @@ function CompareScreen() {
                   name={`energy_kwh_${period}`}
                   autoComplete="on"
                   min="0"
-                  step="0.01"
+                  step="0.001"
                   value={form.energy_by_periods[period]}
                   onChange={(event) => updatePeriod(period, event.target.value)}
                 />
