@@ -97,6 +97,34 @@ function CompareScreen() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPublishedTemplateVersion() {
+      const response = await fetch(`${apiBaseUrl}/templates/comparison/publication`)
+      if (!response.ok || cancelled) {
+        return
+      }
+
+      const { published_version: publishedVersion } = await response.json()
+      if (cancelled) {
+        return
+      }
+
+      setForm((current) => (
+        current.template_version === ''
+          ? { ...current, template_version: publishedVersion }
+          : current
+      ))
+    }
+
+    loadPublishedTemplateVersion()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }))
   }
@@ -466,10 +494,10 @@ function CompareScreen() {
             <input
               value={form.template_version}
               onChange={(event) => updateField('template_version', event.target.value)}
-              placeholder="v1"
+              placeholder="Versió publicada"
             />
             <small className="field-help">
-              Si el deixeu buit, es farà servir la versió publicada.
+              Es carrega la versió publicada i la podeu canviar si cal.
             </small>
             <FieldError error={errors.template_version} />
           </label>
