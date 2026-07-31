@@ -450,7 +450,7 @@ function CompareScreen() {
                 autoComplete="on"
                 min="0"
                 max="100"
-                step="0.01"
+                step="0.000001"
                 value={form.electric_tax_rate_percent}
                 onChange={(event) => updateField('electric_tax_rate_percent', event.target.value)}
               />
