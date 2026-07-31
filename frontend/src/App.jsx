@@ -19,6 +19,7 @@ const initialForm = {
     P2: '',
   },
   self_consumption_surplus_kwh: '',
+  adjustment_service_eur_per_kwh: '',
   meter_rental_eur: '',
   vat_rate_percent: '21',
   electric_tax_rate_percent: '5.11',
@@ -67,6 +68,30 @@ function CompareScreen() {
   const [openingHtmlPreview, setOpeningHtmlPreview] = useState(false)
   const [extractingInvoice, setExtractingInvoice] = useState(false)
   const [extractionIssues, setExtractionIssues] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadComparisonInputDefaults() {
+      const response = await fetch(`${apiBaseUrl}/comparison-input-defaults`)
+      if (!response.ok || cancelled) {
+        return
+      }
+
+      const defaults = await response.json()
+      setForm((current) => (
+        current.adjustment_service_eur_per_kwh === ''
+          ? { ...current, adjustment_service_eur_per_kwh: String(defaults.adjustment_service_eur_per_kwh) }
+          : current
+      ))
+    }
+
+    loadComparisonInputDefaults()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }))
@@ -127,6 +152,7 @@ function CompareScreen() {
         P2: numberOrEmpty(form.contracted_power_kw_by_periods.P2),
       },
       self_consumption_surplus_kwh: numberOrEmpty(form.self_consumption_surplus_kwh),
+      adjustment_service_eur_per_kwh: numberOrEmpty(form.adjustment_service_eur_per_kwh),
       meter_rental_eur: numberOrEmpty(form.meter_rental_eur),
       vat_rate_percent: numberOrEmpty(form.vat_rate_percent),
       electric_tax_rate_percent: numberOrEmpty(form.electric_tax_rate_percent),
@@ -374,6 +400,19 @@ function CompareScreen() {
               onChange={(event) => updateField('competitor_invoice_amount', event.target.value)}
             />
             <FieldError error={errors.competitor_invoice_amount} />
+          </label>
+          <label>
+            Servei d'ajust (EUR/kWh)
+            <input
+              type="number"
+              name="adjustment_service_eur_per_kwh"
+              autoComplete="on"
+              min="0"
+              step="0.000001"
+              value={form.adjustment_service_eur_per_kwh}
+              onChange={(event) => updateField('adjustment_service_eur_per_kwh', event.target.value)}
+            />
+            <FieldError error={errors.adjustment_service_eur_per_kwh} />
           </label>
           <label>
             Lloguer del comptador (EUR)

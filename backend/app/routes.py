@@ -15,6 +15,7 @@ from .config import (
     get_comparison_template_version_files,
     get_published_comparison_template_version,
     list_comparison_template_versions,
+    load_pricing_config,
     preview_comparison_template_version,
     publish_comparison_template_version,
     rollback_comparison_template_version,
@@ -42,6 +43,7 @@ SAMPLE_PREVIEW_PAYLOAD = {
         "P2": 2.3,
     },
     "self_consumption_surplus_kwh": 0,
+    "adjustment_service_eur_per_kwh": 0,
     "meter_rental_eur": 0.81,
     "vat_rate_percent": 21,
     "electric_tax_rate_percent": 5.11,
@@ -51,6 +53,12 @@ SAMPLE_PREVIEW_PAYLOAD = {
 @api.get("/health")
 def healthcheck():
     return {"status": "ok"}
+
+
+@api.get("/comparison-input-defaults")
+def comparison_input_defaults():
+    pricing = load_pricing_config()
+    return {"adjustment_service_eur_per_kwh": pricing["adjustment_service_eur_per_kwh"]}
 
 
 @api.post("/compare")

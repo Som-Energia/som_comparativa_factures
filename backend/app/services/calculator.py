@@ -24,6 +24,7 @@ class ComparisonInput:
     energy_by_periods: dict[str, Decimal]
     contracted_power_kw_by_periods: dict[str, Decimal]
     self_consumption_surplus_kwh: Decimal
+    adjustment_service_eur_per_kwh: Decimal
     meter_rental_eur: Decimal
     vat_rate: Decimal
     electric_tax_rate: Decimal
@@ -63,10 +64,12 @@ def build_comparison_report(payload: dict) -> dict:
             }
         )
 
-    regulated_charge = _money(Decimal(str(pricing["regulated_charge_eur_per_day"])) * data.billing_days)
+    adjustment_service = _money(sum(data.energy_by_periods.values()) * data.adjustment_service_eur_per_kwh)
     social_bonus = _money(Decimal(str(pricing["social_bonus_eur_per_day"])) * data.billing_days)
     meter_rental = _money(data.meter_rental_eur)
-    subtotal_before_compensation = energy_total + power_total + regulated_charge + social_bonus + meter_rental
+    subtotal_before_compensation = (
+        energy_total + power_total + adjustment_service + social_bonus + meter_rental
+    )
     surplus_price = Decimal(str(pricing["self_consumption_surplus_price_eur_per_kwh"]))
     compensation_requested = _money(data.self_consumption_surplus_kwh * surplus_price)
     compensation_applied = min(compensation_requested, subtotal_before_compensation)
@@ -93,6 +96,7 @@ def build_comparison_report(payload: dict) -> dict:
                 period: float(kw) for period, kw in data.contracted_power_kw_by_periods.items()
             },
             "self_consumption_surplus_kwh": float(data.self_consumption_surplus_kwh),
+            "adjustment_service_eur_per_kwh": float(data.adjustment_service_eur_per_kwh),
             "meter_rental_eur": float(data.meter_rental_eur),
             "vat_rate_percent": float(data.vat_rate * 100),
             "electric_tax_rate_percent": float(data.electric_tax_rate * 100),
@@ -118,7 +122,7 @@ def build_comparison_report(payload: dict) -> dict:
                 "power_eur": float(power_total),
                 "energy_eur": float(energy_total),
                 "surplus_compensation_eur": float(compensation_applied),
-                "adjustment_services_eur": float(regulated_charge),
+                "adjustment_services_eur": float(adjustment_service),
                 "social_bonus_eur": float(social_bonus),
                 "electric_tax_eur": float(electric_tax),
                 "meter_rental_eur": float(meter_rental),
@@ -130,7 +134,7 @@ def build_comparison_report(payload: dict) -> dict:
                     {"label": f"Cost de potència {item['period']}", "amount": item["amount"]}
                     for item in power_breakdown
                 ],
-                {"label": "Cost Serveis d'Ajust", "amount": float(regulated_charge)},
+                {"label": "Cost Serveis d'Ajust", "amount": float(adjustment_service)},
                 {"label": "Bo Social", "amount": float(social_bonus)},
                 {"label": "Cost del lloguer del comptador", "amount": float(meter_rental)},
                 {"label": "Compensació d'excedents", "amount": float(-compensation_applied)},
@@ -207,6 +211,12 @@ def _validate_payload(payload: dict) -> ComparisonInput:
         "Els excedents d'autoconsum han de ser positius o zero.",
         errors,
     )
+    adjustment_service_eur_per_kwh = _parse_non_negative_decimal(
+        payload.get("adjustment_service_eur_per_kwh"),
+        "adjustment_service_eur_per_kwh",
+        "El servei d'ajust per kWh ha de ser positiu o zero.",
+        errors,
+    )
     meter_rental_eur = _parse_non_negative_decimal(
         payload.get("meter_rental_eur"),
         "meter_rental_eur",
@@ -232,6 +242,7 @@ def _validate_payload(payload: dict) -> ComparisonInput:
         energy_by_periods=energy_by_periods,
         contracted_power_kw_by_periods=contracted_power_kw_by_periods,
         self_consumption_surplus_kwh=self_consumption_surplus_kwh,
+        adjustment_service_eur_per_kwh=adjustment_service_eur_per_kwh,
         meter_rental_eur=meter_rental_eur,
         vat_rate=vat_rate,
         electric_tax_rate=electric_tax_rate,
