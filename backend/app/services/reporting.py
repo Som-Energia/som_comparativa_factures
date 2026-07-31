@@ -54,7 +54,7 @@ def _render_report_html(report: dict, template_bundle, *, asset_mode: str) -> st
 def _render_reference_report_pdf(report: dict, template_bundle) -> bytes:
     reference_pdf = _reference_pdf_path()
     simulation_html = _render_reference_simulation_html(report, template_bundle)
-    simulation_pdf = HTML(string=simulation_html, base_url=template_bundle.assets_dir.as_uri()).write_pdf()
+    simulation_pdf = HTML(string=simulation_html, base_url=f"{ASSETS_DIR.as_uri()}/").write_pdf()
 
     document = fitz.open(reference_pdf)
     replacement_page = fitz.open(stream=simulation_pdf, filetype="pdf")

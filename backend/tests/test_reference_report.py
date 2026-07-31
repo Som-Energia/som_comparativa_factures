@@ -1,6 +1,10 @@
+from pathlib import Path
+from unittest.mock import Mock
+
 import fitz
 
 from app import create_app
+from app.services import reporting
 
 
 def _payload():
@@ -55,3 +59,19 @@ def test_reference_template_pdf_preserves_static_pages_and_renders_calculation_p
     assert len(energy_values) == 3
     assert all(abs(word[1] - power_label[1]) < 1 for word in power_values)
     assert all(abs(word[1] - energy_label[1]) < 1 for word in energy_values)
+
+
+def test_reference_page_resolves_outfit_fonts_from_assets_root(monkeypatch):
+    html = Mock()
+    html.return_value.write_pdf.return_value = b"simulation"
+    reference_pdf = Mock()
+    reference_pdf.tobytes.return_value = b"reference"
+    monkeypatch.setattr(reporting, "ASSETS_DIR", Path("/app/assets"))
+    monkeypatch.setattr(reporting, "HTML", html)
+    monkeypatch.setattr(reporting, "_reference_pdf_path", lambda: Path("reference.pdf"))
+    monkeypatch.setattr(reporting, "_render_reference_simulation_html", lambda report, bundle: "<html></html>")
+    monkeypatch.setattr(reporting.fitz, "open", Mock(side_effect=[reference_pdf, Mock()]))
+
+    reporting._render_reference_report_pdf({}, None)
+
+    assert html.call_args.kwargs["base_url"] == "file:///app/assets/"
