@@ -770,7 +770,7 @@ def extract_electricity_tax_rate(text: str) -> float | None:
         text, re.IGNORECASE,
     )
     if m:
-        return round(normalize_number(m.group(1)), 1)
+        return normalize_number(m.group(1))
 
     # Iberdrola: "Impuesto sobre electricidad  N,NNNNNNNN % s/..."
     m = re.search(
@@ -778,7 +778,7 @@ def extract_electricity_tax_rate(text: str) -> float | None:
         text, re.IGNORECASE,
     )
     if m:
-        return round(normalize_number(m.group(1)), 1)
+        return normalize_number(m.group(1))
 
     # Naturgy: "Impuesto electricidad  NNN €  x N,NNNNNN %"
     m = re.search(
@@ -786,7 +786,7 @@ def extract_electricity_tax_rate(text: str) -> float | None:
         text, re.IGNORECASE,
     )
     if m:
-        return round(normalize_number(m.group(1)), 1)
+        return normalize_number(m.group(1))
 
     # Factor Energia: "Import IEE N% s/(base)= amount €" states the applied rate directly.
     m = re.search(
@@ -795,7 +795,7 @@ def extract_electricity_tax_rate(text: str) -> float | None:
         re.IGNORECASE,
     )
     if m:
-        return round(normalize_number(m.group(1)), 1)
+        return normalize_number(m.group(1))
 
     # Factor Energia: reduced tax notice states the previous rate followed by the applied rate.
     m = re.search(
@@ -805,7 +805,7 @@ def extract_electricity_tax_rate(text: str) -> float | None:
         re.IGNORECASE | re.DOTALL,
     )
     if m:
-        return round(normalize_number(m.group(1)), 1)
+        return normalize_number(m.group(1))
 
     # Repsol (català/castellà): "Impost elèctric  N,NN €  NNN x N,NNNNNNNN%"
     m = re.search(
@@ -813,7 +813,7 @@ def extract_electricity_tax_rate(text: str) -> float | None:
         text, re.IGNORECASE,
     )
     if m:
-        return round(normalize_number(m.group(1)), 1)
+        return normalize_number(m.group(1))
 
     return None
 

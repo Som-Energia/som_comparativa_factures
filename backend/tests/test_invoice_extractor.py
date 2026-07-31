@@ -218,11 +218,11 @@ class ExtractionTests(unittest.TestCase):
 
     def test_extracts_electricity_tax_rate_repsol(self):
         text = "Impost elèctric                          2,34 €  85,23 x 2,74680851%"
-        self.assertEqual(extract_electricity_tax_rate(text), 2.7)
+        self.assertEqual(extract_electricity_tax_rate(text), 2.74680851)
 
     def test_extracts_factor_energia_electricity_tax_rate_from_import_iee(self):
-        text = "Import IEE 0,50000000 % s/(154,09)= 0,77 €"
-        self.assertEqual(extract_electricity_tax_rate(text), 0.5)
+        text = "Import IEE 0,50000001 % s/(154,09)= 0,77 €"
+        self.assertEqual(extract_electricity_tax_rate(text), 0.50000001)
 
     def test_extracts_factor_energia_reduced_electricity_tax_rate(self):
         text = (
