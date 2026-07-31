@@ -85,13 +85,13 @@ def empty_result() -> dict[str, Any]:
         "billing_days": None,
         "competitor_invoice_amount": None,
         "energy_by_periods": {"P1": None, "P2": None, "P3": None},
-        "contracted_powers": {"P1": None, "P2": None, "P3": None},
-        "meter_rental": None,
+        "contracted_power_kw_by_periods": {"P1": None, "P2": None, "P3": None},
+        "meter_rental_eur": None,
         "vat_amount": None,
-        "vat_rate": None,
+        "vat_rate_percent": None,
         "electricity_tax": None,
-        "electricity_tax_rate": None,
-        "surplus_kwh": None,
+        "electric_tax_rate_percent": None,
+        "self_consumption_surplus_kwh": None,
         "data_quality": {"status": "needs_review", "issues": []},
     }
 
@@ -731,6 +731,15 @@ def extract_electricity_tax(text: str) -> float | None:
     if m:
         return normalize_number(m.group(1))
 
+    # Factor Energia: "Import IEE N% s/(base)= amount €" reports the final tax amount.
+    m = re.search(
+        rf"import\s+iee\s+\d{{1,3}}(?:[.,]\d+)?\s*%\s+s/\s*\([^)]{{1,80}}\)\s*=\s*(-?{AMOUNT_PATTERN[1:-1]})\s*€",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        return normalize_number(m.group(1))
+
     # Repsol (català/castellà): "Impost elèctric / Impuesto Eléctrico  N,NN €  NNN x N%"
     # L'import és el primer valor numèric de la línia
     m = re.search(
@@ -775,6 +784,25 @@ def extract_electricity_tax_rate(text: str) -> float | None:
     m = re.search(
         r"impuesto\s+electricidad\b[^\n]{0,40}?x\s+(\d{1,3}(?:[.,]\d+)?)\s*%",
         text, re.IGNORECASE,
+    )
+    if m:
+        return round(normalize_number(m.group(1)), 1)
+
+    # Factor Energia: "Import IEE N% s/(base)= amount €" states the applied rate directly.
+    m = re.search(
+        r"import\s+iee\s+(\d{1,3}(?:[.,]\d+)?)\s*%\s+s/\s*\([^)]{1,80}\)\s*=\s*-?\d",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        return round(normalize_number(m.group(1)), 1)
+
+    # Factor Energia: reduced tax notice states the previous rate followed by the applied rate.
+    m = re.search(
+        r"impost\s+especial\s+sobre\s+l['’]electricitat\b.{0,200}?"
+        r"redu[iï]t\s+del\s+\d{1,3}(?:[.,]\d+)?\s*%\s+al\s+(\d{1,3}(?:[.,]\d+)?)\s*%",
+        text,
+        re.IGNORECASE | re.DOTALL,
     )
     if m:
         return round(normalize_number(m.group(1)), 1)
@@ -1012,13 +1040,13 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     result["billing_days"] = billing_days
     result["competitor_invoice_amount"] = extract_total_amount(text, words)
     result["energy_by_periods"] = extract_energy_by_periods(text, words)
-    result["contracted_powers"] = extract_contracted_powers(text, words)
-    result["meter_rental"] = extract_meter_rental(text)
+    result["contracted_power_kw_by_periods"] = extract_contracted_powers(text, words)
+    result["meter_rental_eur"] = extract_meter_rental(text)
     result["vat_amount"] = extract_vat_amount(text)
-    result["vat_rate"] = extract_vat_rate(text)
+    result["vat_rate_percent"] = extract_vat_rate(text)
     result["electricity_tax"] = extract_electricity_tax(text)
-    result["electricity_tax_rate"] = extract_electricity_tax_rate(text)
-    result["surplus_kwh"] = extract_surplus_kwh(text)
+    result["electric_tax_rate_percent"] = extract_electricity_tax_rate(text)
+    result["self_consumption_surplus_kwh"] = extract_surplus_kwh(text)
 
     for field in ("retailer", "cups", "titular", "billing_days", "competitor_invoice_amount"):
         if result[field] is None:
@@ -1028,25 +1056,25 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
         if value is None:
             add_issue(result, f"energy_by_periods.{period}", "missing_or_unverified", "No s'ha pogut extreure el consum en kWh.")
 
-    # contracted_powers no genera issues: el camp s'implementa progressivament per comercialitzadora.
-    for period, value in result["contracted_powers"].items():
+    # Contracted power is implemented progressively for each retailer.
+    for period, value in result["contracted_power_kw_by_periods"].items():
         if value is None:
-            add_issue(result, f"contracted_powers.{period}", "missing_or_unverified", "No s'ha pogut extreure la potència contractada.")
+            add_issue(result, f"contracted_power_kw_by_periods.{period}", "missing_or_unverified", "No s'ha pogut extreure la potència contractada.")
 
-    if result["meter_rental"] is None:
-        add_issue(result, "meter_rental", "missing_or_unverified", "No s'ha pogut extreure el lloguer del comptador.")
+    if result["meter_rental_eur"] is None:
+        add_issue(result, "meter_rental_eur", "missing_or_unverified", "No s'ha pogut extreure el lloguer del comptador.")
 
     if result["vat_amount"] is None:
         add_issue(result, "vat_amount", "missing_or_unverified", "No s'ha pogut extreure l'import de l'IVA.")
 
-    if result["vat_rate"] is None:
-        add_issue(result, "vat_rate", "missing_or_unverified", "No s'ha pogut extreure el percentatge d'IVA.")
+    if result["vat_rate_percent"] is None:
+        add_issue(result, "vat_rate_percent", "missing_or_unverified", "No s'ha pogut extreure el percentatge d'IVA.")
 
     if result["electricity_tax"] is None:
         add_issue(result, "electricity_tax", "missing_or_unverified", "No s'ha pogut extreure l'impost elèctric.")
 
-    if result["electricity_tax_rate"] is None:
-        add_issue(result, "electricity_tax_rate", "missing_or_unverified", "No s'ha pogut extreure el percentatge de l'impost elèctric.")
+    if result["electric_tax_rate_percent"] is None:
+        add_issue(result, "electric_tax_rate_percent", "missing_or_unverified", "No s'ha pogut extreure el percentatge de l'impost elèctric.")
 
     if derived:
         add_issue(result, "billing_days", "derived_value", "Calculat a partir del període de facturació; cal confirmar la convenció de dies.")

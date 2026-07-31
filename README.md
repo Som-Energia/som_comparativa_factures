@@ -10,7 +10,7 @@ MVP per generar una comparativa de factura amb Som Energia a partir d'un formula
 - `backend/config/pdf_templates/comparison/published.json`: punter de la versio activa del template.
 - `backend/config/pdf_templates/comparison/versions/v1/`: contracte editable de `content.yaml`, `theme.yaml` i `assets.yaml`.
 
-## Contracte minim d'entrada
+## Contracte minim d'entrada de comparativa
 
 ```json
 {
@@ -46,7 +46,7 @@ Endpoints:
 
 - `POST /api/compare`: retorna resum JSON validat.
 - `POST /api/invoices/extract-for-comparison`: rep un `multipart/form-data` amb el camp `pdf` i retorna les dades extretes, junt amb el payload preparat per a la comparativa. Disponible per a la interfície interna.
-- `POST /api/invoices/extract`: API externa protegida. Rep el mateix camp `pdf` i requereix `Authorization: Bearer <INVOICE_EXTRACTOR_API_TOKEN>`.
+- `POST /api/invoices/extract`: API externa protegida. Rep el mateix camp `pdf`, requereix `Authorization: Bearer <INVOICE_EXTRACTOR_API_TOKEN>` i retorna les dades extretes amb les claus del contracte de comparativa.
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
 - `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
 - `GET /api/health`: healthcheck.
@@ -58,6 +58,29 @@ curl -X POST "https://comparativa.example.org/api/invoices/extract" \
   -H "Authorization: Bearer $INVOICE_EXTRACTOR_API_TOKEN" \
   -F "pdf=@/ruta/factura.pdf"
 ```
+
+La resposta inclou les claus del contracte d'entrada de comparativa i conserva dades addicionals que poden ser útils per revisar l'extracció:
+
+```json
+{
+  "retailer": "Iberdrola",
+  "cups": "ES0210002100000000ZN0F",
+  "titular": "Persona Persona",
+  "billing_days": 30,
+  "competitor_invoice_amount": 54.0,
+  "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
+  "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3, "P3": 2.3},
+  "self_consumption_surplus_kwh": null,
+  "meter_rental_eur": 0.81,
+  "vat_amount": 11.34,
+  "vat_rate_percent": 21.0,
+  "electricity_tax": 1.35,
+  "electric_tax_rate_percent": 5.11,
+  "data_quality": {"status": "verified", "issues": []}
+}
+```
+
+`POST /api/invoices/extract-for-comparison` retorna aquest objecte dins d'`extraction` i afegeix `comparison_input`, preparat per enviar directament a `POST /api/compare`. Aquest últim conserva únicament P1 i P2 de la potència contractada, perquè són els períodes que admet el càlcul actual.
 
 ## Frontend
 
@@ -116,7 +139,7 @@ El frontend es publica amb Traefik. Abans de crear el stack a Portainer, definiu
 Inicieu sessio al registre i publiqueu les dues imatges amb un tag de versio immutable. El slug del projecte i els noms de repositori s'han de copiar de Harbor; l'script rep les referencies completes per no assumir-ne cap convencio.
 L'script també actualitza el tag mutable `latest`; el stack de Portainer pot usar-lo per a desplegaments automàtics, mentre que els tags immutables de versió serveixen per identificar i recuperar desplegaments anteriors.
 
-La versió de l'aplicació viu a `VERSION` i s'aplica a les imatges de frontend i backend. Quan la publicació d'ambdues imatges té èxit, l'script crea i puja el tag Git anotat corresponent, com `v0.2.2`. Per evitar etiquetar codi que no correspon a les imatges, exigeix que l'arbre de treball estiga net i que el tag no existisca localment ni a `origin`. Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
+La versió de l'aplicació viu exclusivament a `VERSION`: el frontend la mostra, les imatges de frontend i backend la fan servir com a tag i determina el tag Git anotat, com `v0.3.0`. Quan la publicació d'ambdues imatges té èxit, l'script crea i puja aquest tag. Per evitar etiquetar codi que no correspon a les imatges, exigeix que l'arbre de treball estiga net i que el tag no existisca localment ni a `origin`. Per redeplegar automàticament un stack de Portainer Community Edition després de publicar les imatges, definiu un access token localment. No el deseu al repositori:
 
 ```bash
 export PORTAINER_URL="https://portainer.example.org"

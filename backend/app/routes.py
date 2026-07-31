@@ -310,7 +310,7 @@ def _extract_uploaded_invoice() -> dict | Response:
 
 
 def _build_comparison_input(extraction: dict) -> dict:
-    powers = extraction["contracted_powers"]
+    powers = extraction["contracted_power_kw_by_periods"]
     return {
         "cups": extraction["cups"],
         "titular": extraction["titular"],
@@ -321,10 +321,10 @@ def _build_comparison_input(extraction: dict) -> dict:
             "P1": powers["P1"],
             "P2": powers["P2"],
         },
-        "self_consumption_surplus_kwh": extraction["surplus_kwh"],
-        "meter_rental_eur": extraction["meter_rental"],
-        "vat_rate_percent": extraction["vat_rate"],
-        "electric_tax_rate_percent": extraction["electricity_tax_rate"],
+        "self_consumption_surplus_kwh": extraction["self_consumption_surplus_kwh"],
+        "meter_rental_eur": extraction["meter_rental_eur"],
+        "vat_rate_percent": extraction["vat_rate_percent"],
+        "electric_tax_rate_percent": extraction["electric_tax_rate_percent"],
     }
 
 
