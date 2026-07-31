@@ -61,7 +61,10 @@ def test_comparison_input_defaults_returns_adjustment_service_price():
     response = client.get("/api/comparison-input-defaults")
 
     assert response.status_code == 200
-    assert response.get_json() == {"adjustment_service_eur_per_kwh": 0.019}
+    assert response.get_json() == {
+        "adjustment_service_eur_per_kwh": 0.019,
+        "electric_tax_rate_percent": 5.11269632,
+    }
 
 
 def test_compare_returns_validation_errors_for_invalid_payload():

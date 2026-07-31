@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
+from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -46,7 +47,7 @@ SAMPLE_PREVIEW_PAYLOAD = {
     "adjustment_service_eur_per_kwh": 0,
     "meter_rental_eur": 0.81,
     "vat_rate_percent": 21,
-    "electric_tax_rate_percent": 5.11,
+    "electric_tax_rate_percent": 5.11269632,
 }
 
 
@@ -58,7 +59,10 @@ def healthcheck():
 @api.get("/comparison-input-defaults")
 def comparison_input_defaults():
     pricing = load_pricing_config()
-    return {"adjustment_service_eur_per_kwh": pricing["adjustment_service_eur_per_kwh"]}
+    return {
+        "adjustment_service_eur_per_kwh": pricing["adjustment_service_eur_per_kwh"],
+        "electric_tax_rate_percent": float(Decimal(str(pricing["electric_tax_rate"])) * 100),
+    }
 
 
 @api.post("/compare")

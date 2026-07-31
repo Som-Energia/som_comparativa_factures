@@ -22,7 +22,7 @@ const initialForm = {
   adjustment_service_eur_per_kwh: '',
   meter_rental_eur: '',
   vat_rate_percent: '21',
-  electric_tax_rate_percent: '5.11',
+  electric_tax_rate_percent: '',
 }
 
 const initialTemplateFiles = {
@@ -79,11 +79,15 @@ function CompareScreen() {
       }
 
       const defaults = await response.json()
-      setForm((current) => (
-        current.adjustment_service_eur_per_kwh === ''
-          ? { ...current, adjustment_service_eur_per_kwh: String(defaults.adjustment_service_eur_per_kwh) }
-          : current
-      ))
+      setForm((current) => ({
+        ...current,
+        adjustment_service_eur_per_kwh: current.adjustment_service_eur_per_kwh === ''
+          ? String(defaults.adjustment_service_eur_per_kwh)
+          : current.adjustment_service_eur_per_kwh,
+        electric_tax_rate_percent: current.electric_tax_rate_percent === ''
+          ? String(defaults.electric_tax_rate_percent)
+          : current.electric_tax_rate_percent,
+      }))
     }
 
     loadComparisonInputDefaults()
@@ -450,7 +454,7 @@ function CompareScreen() {
                 autoComplete="on"
                 min="0"
                 max="100"
-                step="0.000001"
+                step="0.00000001"
                 value={form.electric_tax_rate_percent}
                 onChange={(event) => updateField('electric_tax_rate_percent', event.target.value)}
               />
