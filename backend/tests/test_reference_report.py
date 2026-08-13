@@ -70,10 +70,31 @@ def test_reference_page_resolves_outfit_fonts_from_assets_root(monkeypatch):
     reference_pdf.tobytes.return_value = b"reference"
     monkeypatch.setattr(reporting, "ASSETS_DIR", Path("/app/assets"))
     monkeypatch.setattr(reporting, "HTML", html)
-    monkeypatch.setattr(reporting, "_reference_pdf_path", lambda: Path("reference.pdf"))
-    monkeypatch.setattr(reporting, "_render_reference_simulation_html", lambda report, bundle: "<html></html>")
+    monkeypatch.setattr(reporting, "_reference_pdf_path", lambda locale: Path("reference.pdf"))
+    monkeypatch.setattr(reporting, "_render_reference_simulation_html", lambda report, bundle, locale: "<html></html>")
     monkeypatch.setattr(reporting.fitz, "open", Mock(side_effect=[reference_pdf, Mock()]))
 
-    reporting._render_reference_report_pdf({}, None)
+    reporting._render_reference_report_pdf({}, None, "ca")
 
     assert html.call_args.kwargs["base_url"] == "file:///app/assets/"
+
+
+def test_reference_template_pdf_renders_spanish_calculation_page():
+    client = create_app().test_client()
+
+    response = client.post("/api/reports/comparison.pdf", json=_payload() | {"locale": "es"})
+
+    assert response.status_code == 200
+    document = fitz.open(stream=response.data, filetype="pdf")
+    assert document.page_count == 5
+
+    calculation_page = document[2]
+    calculation_text = calculation_page.get_text()
+    assert "Persona de prova" in calculation_text
+    assert "Coste por la energía utilizada" in calculation_text
+    assert "Sols (€) acumulados en el Flux Solar" in calculation_text
+    assert "19,15 €" in calculation_text
+    assert {link["uri"] for link in calculation_page.get_links()} == {
+        "https://es.support.somenergia.coop/article/1398-que-son-los-excedentes-no-compensados",
+        "https://es.support.somenergia.coop/article/1372-que-es-el-flux-solar",
+    }

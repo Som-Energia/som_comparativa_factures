@@ -97,6 +97,15 @@ def test_comparison_html_preview_renders_submitted_payload():
     assert "Persona JSON" in response.get_data(as_text=True)
 
 
+def test_comparison_pdf_rejects_an_unsupported_locale():
+    client = create_app().test_client()
+
+    response = client.post("/api/reports/comparison.pdf", json=build_payload(locale="en"))
+
+    assert response.status_code == 400
+    assert response.get_json() == {"errors": {"locale": "L'idioma del PDF ha de ser 'ca' o 'es'."}}
+
+
 def test_compare_applies_surplus_compensation_beyond_energy_cost():
     app = create_app()
     client = app.test_client()

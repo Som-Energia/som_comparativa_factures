@@ -9,26 +9,99 @@ from flask import render_template
 import fitz
 from weasyprint import HTML
 
-from app.config import ASSETS_DIR, TemplateResolutionError, resolve_comparison_template_bundle
+from app.config import ASSETS_DIR, TemplateResolutionError, TemplateValidationError, resolve_comparison_template_bundle
+
+REFERENCE_COPY = {
+    "ca": {
+        "summary_title": "Simulació de cost de la factura",
+        "current_cost": "Cost actual",
+        "som_cost": "Cost amb Som Energia",
+        "tariff_cost": "Cost calculat amb la tarifa {tariff_name}",
+        "prices_effective": "Preus vigents a partir de l'{effective_date}",
+        "detail_title": "Detall de la simulació de la teva factura amb Som Energia",
+        "holder": "Titular:",
+        "invoice_data": "Dades de la factura",
+        "tariff_periods": "Períodes tarifaris",
+        "contracted_power": "Potències contractades (kW)",
+        "energy_used": "Energia utilitzada (kWh)",
+        "self_consumption_surplus": "Excedents d'autoconsum (kWh)",
+        "adjustment_services": "Serveis d'ajust en línia a part (€)",
+        "meter_rental": "Lloguer del comptador (€)",
+        "billing_days": "Dies del període facturat",
+        "invoice_cost": "Cost calculat amb la tarifa {tariff_name}",
+        "power_cost": "Cost per la potència contractada",
+        "energy_cost": "Cost per l'energia utilitzada",
+        "surplus_compensation": "Compensació d'excedents",
+        "adjustment_cost": "Cost Serveis d'Ajust",
+        "social_bonus": "Bo Social",
+        "electric_tax": "Impost elèctric",
+        "meter_rental_cost": "Cost del lloguer del comptador",
+        "non_compensated_surplus": "Import dels {link} (ajust límit de compensació)",
+        "non_compensated_surplus_link": "excedents no compensats",
+        "flux_solar": "Sols (€) acumulats al {link}: el 80% de l'import dels excedents no compensats. Es descomptarà a les següents factures.",
+        "flux_solar_link": "Flux Solar",
+        "notice": "Aquesta simulació només és vàlida per aquesta factura i el resultat no és extrapolable a una altra factura ni tampoc al cost anual de la llum.",
+        "footer": "Simulació factura Som Energia",
+        "non_compensated_surplus_url": "https://ca.support.somenergia.coop/article/1397-que-son-els-excedents-no-compensats",
+        "flux_solar_url": "https://ca.support.somenergia.coop/article/1371-que-es-el-flux-solar",
+        "months": {5: "maig"},
+        "date_format": "l'{day} de {month} de {year}",
+    },
+    "es": {
+        "summary_title": "Simulación del coste de la factura",
+        "current_cost": "Coste actual",
+        "som_cost": "Coste con Som Energia",
+        "tariff_cost": "Coste calculado con la tarifa {tariff_name}",
+        "prices_effective": "Precios vigentes a partir del {effective_date}",
+        "detail_title": "Detalle de la simulación de tu factura con Som Energia",
+        "holder": "Titular:",
+        "invoice_data": "Datos de la factura",
+        "tariff_periods": "Períodos tarifarios",
+        "contracted_power": "Potencias contratadas (kW)",
+        "energy_used": "Energía utilizada (kWh)",
+        "self_consumption_surplus": "Excedentes de autoconsumo (kWh)",
+        "adjustment_services": "Servicios de ajuste en línea a parte (€)",
+        "meter_rental": "Alquiler del contador (€)",
+        "billing_days": "Días del período facturado",
+        "invoice_cost": "Coste de la factura con la tarifa {tariff_name}",
+        "power_cost": "Coste por la potencia contratada",
+        "energy_cost": "Coste por la energía utilizada",
+        "surplus_compensation": "Compensación de excedentes",
+        "adjustment_cost": "Coste Servicios de Ajuste",
+        "social_bonus": "Bono Social",
+        "electric_tax": "Impuesto eléctrico",
+        "meter_rental_cost": "Coste del alquiler del contador",
+        "non_compensated_surplus": "Importe de los {link} (ajuste límite de compensación)",
+        "non_compensated_surplus_link": "excedentes no compensados",
+        "flux_solar": "Sols (€) acumulados en el {link}: el 80% del importe de los excedentes no compensados. Se descontará en las siguientes facturas.",
+        "flux_solar_link": "Flux Solar",
+        "notice": "Esta simulación solo es válida para esta factura y el resultado no es extrapolable a otra factura ni tampoco al coste anual de la luz.",
+        "footer": "Simulación factura Som Energia",
+        "non_compensated_surplus_url": "https://es.support.somenergia.coop/article/1398-que-son-los-excedentes-no-compensados",
+        "flux_solar_url": "https://es.support.somenergia.coop/article/1372-que-es-el-flux-solar",
+        "months": {5: "mayo"},
+        "date_format": "{day} de {month} de {year}",
+    },
+}
 
 
-def render_report_pdf(report: dict, template_version: str | None = None) -> bytes:
+def render_report_pdf(report: dict, template_version: str | None = None, locale: str = "ca") -> bytes:
     template_bundle = resolve_comparison_template_bundle(version=template_version)
     if template_bundle.version == "v3":
-        return _render_reference_report_pdf(report, template_bundle)
+        return _render_reference_report_pdf(report, template_bundle, locale)
 
     html = _render_report_html(report, template_bundle, asset_mode="pdf")
     return HTML(string=html, base_url=template_bundle.assets_dir.as_uri()).write_pdf()
 
 
-def render_report_html(report: dict, template_version: str | None = None) -> str:
+def render_report_html(report: dict, template_version: str | None = None, locale: str = "ca") -> str:
     template_bundle = resolve_comparison_template_bundle(version=template_version)
-    return render_report_html_for_bundle(report, template_bundle)
+    return render_report_html_for_bundle(report, template_bundle, locale=locale)
 
 
-def render_report_html_for_bundle(report: dict, template_bundle) -> str:
+def render_report_html_for_bundle(report: dict, template_bundle, locale: str = "ca") -> str:
     if template_bundle.version == "v3":
-        return _render_reference_simulation_html(report, template_bundle)
+        return _render_reference_simulation_html(report, template_bundle, locale)
 
     return _render_report_html(report, template_bundle, asset_mode="html")
 
@@ -51,9 +124,9 @@ def _render_report_html(report: dict, template_bundle, *, asset_mode: str) -> st
     )
 
 
-def _render_reference_report_pdf(report: dict, template_bundle) -> bytes:
-    reference_pdf = _reference_pdf_path()
-    simulation_html = _render_reference_simulation_html(report, template_bundle)
+def _render_reference_report_pdf(report: dict, template_bundle, locale: str) -> bytes:
+    reference_pdf = _reference_pdf_path(locale)
+    simulation_html = _render_reference_simulation_html(report, template_bundle, locale)
     simulation_pdf = HTML(string=simulation_html, base_url=f"{ASSETS_DIR.as_uri()}/").write_pdf()
 
     document = fitz.open(reference_pdf)
@@ -63,31 +136,48 @@ def _render_reference_report_pdf(report: dict, template_bundle) -> bytes:
     return document.tobytes(garbage=4, deflate=True)
 
 
-def _render_reference_simulation_html(report: dict, template_bundle) -> str:
+def _render_reference_simulation_html(report: dict, template_bundle, locale: str) -> str:
+    copy = _reference_copy(locale)
     return render_template(
         "reports/comparison_reference_page.html",
         report=report,
         euro=euro,
-        effective_date=_format_effective_date(report["pricing"]["effective_date"]),
+        locale=locale,
+        copy=copy,
+        effective_date=_format_effective_date(report["pricing"]["effective_date"], copy),
     )
 
 
-def _reference_pdf_path() -> Path:
-    deployed_path = ASSETS_DIR / "reference" / "comparison-v3.pdf"
+def _reference_pdf_path(locale: str) -> Path:
+    deployed_path = ASSETS_DIR / "reference" / f"comparison-v3-{locale}.pdf"
     if deployed_path.is_file():
         return deployed_path
 
     # Running the backend directly from the checkout uses the tracked design source.
-    checkout_path = Path(__file__).resolve().parents[3] / "assets" / "CA_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf"
+    filenames = {
+        "ca": "CA_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf",
+        "es": "ES_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf",
+    }
+    checkout_path = Path(__file__).resolve().parents[3] / "assets" / filenames[locale]
     if checkout_path.is_file():
         return checkout_path
 
-    raise TemplateResolutionError("No s'ha trobat el PDF mestre de la plantilla de comparativa v3.")
+    raise TemplateResolutionError(f"No s'ha trobat el PDF mestre en idioma '{locale}' de la plantilla de comparativa v3.")
 
 
-def _format_effective_date(value: str) -> str:
+def _reference_copy(locale: str) -> dict:
+    try:
+        return REFERENCE_COPY[locale]
+    except KeyError as exc:
+        raise TemplateValidationError(f"L'idioma '{locale}' no està disponible per al PDF de comparativa.") from exc
+
+
+def _format_effective_date(value: str, copy: dict) -> str:
     year, month, day = value.split("-")
-    return f"{int(day)} de maig de {year}" if month == "05" else f"{int(day)}/{int(month)}/{year}"
+    month_number = int(month)
+    if month_number in copy["months"]:
+        return copy["date_format"].format(day=int(day), month=copy["months"][month_number], year=year)
+    return f"{int(day)}/{month_number}/{year}"
 
 
 def _resolve_template_content(content: dict, report: dict) -> dict:

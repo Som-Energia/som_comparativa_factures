@@ -28,7 +28,7 @@ if [ ! -d /app/assets/pdf_templates/comparison/versions/v3 ]; then
     cp -a /seed-assets/pdf_templates/comparison/versions/v3 /app/assets/pdf_templates/comparison/versions/
 fi
 
-if [ ! -f /app/assets/reference/comparison-v3.pdf ]; then
+if [ ! -f /app/assets/reference/comparison-v3-ca.pdf ]; then
     mkdir -p /app/assets/reference
     cp -a /seed-reference/reference/. /app/assets/reference/
 fi

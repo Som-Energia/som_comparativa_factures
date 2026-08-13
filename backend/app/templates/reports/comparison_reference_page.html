@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ca">
+<html lang="{{ locale }}">
   <head>
     <meta charset="utf-8">
     <style>
@@ -52,25 +52,25 @@
   </head>
   <body>
     <main class="page">
-      <h1>Simulació de cost de la factura</h1>
+      <h1>{{ copy.summary_title }}</h1>
       <div class="summary">
         <table>
-          <thead><tr><th>Cost actual</th><th>Cost amb Som Energia</th><th>{{ report.comparison.savings_label }}</th></tr></thead>
+          <thead><tr><th>{{ copy.current_cost }}</th><th>{{ copy.som_cost }}</th><th>{{ report.comparison.savings_label }}</th></tr></thead>
           <tbody><tr><td>{{ euro(report.comparison.competitor_total) }}</td><td>{{ euro(report.comparison.som_total) }}</td><td>{{ euro(report.comparison.savings) }}</td></tr></tbody>
         </table>
-        <div class="tariff">Cost calculat amb la tarifa {{ report.pricing.tariff_name }}<br>Preus vigents a partir de l'{{ effective_date }}</div>
+        <div class="tariff">{{ copy.tariff_cost.format(tariff_name=report.pricing.tariff_name) }}<br>{{ copy.prices_effective.format(effective_date=effective_date) }}</div>
       </div>
 
-      <h2 class="section-title">Detall de la simulació de la teva factura amb Som Energia</h2>
-      <div class="identity"><strong>Titular:</strong><strong>{{ report.customer.titular }}</strong><strong>CUPS:</strong><strong>{{ report.customer.cups }}</strong></div>
+      <h2 class="section-title">{{ copy.detail_title }}</h2>
+      <div class="identity"><strong>{{ copy.holder }}</strong><strong>{{ report.customer.titular }}</strong><strong>CUPS:</strong><strong>{{ report.customer.cups }}</strong></div>
 
-      <h3 class="invoice-title">Dades de la factura</h3>
+      <h3 class="invoice-title">{{ copy.invoice_data }}</h3>
       <div class="invoice">
         <div class="invoice-labels">
-          <span class="spacer">.</span><span class="spacer">.</span><span>Potències contractades (kW)</span><span>Energia utilitzada (kWh)</span><span>Excedents d'autoconsum (kWh)</span><span>Serveis d'ajust en línia a part (€)</span><span>Lloguer del comptador (€)</span><span>Dies del període facturat</span>
+          <span class="spacer">.</span><span class="spacer">.</span><span>{{ copy.contracted_power }}</span><span>{{ copy.energy_used }}</span><span>{{ copy.self_consumption_surplus }}</span><span>{{ copy.adjustment_services }}</span><span>{{ copy.meter_rental }}</span><span>{{ copy.billing_days }}</span>
         </div>
         <table class="periods">
-          <caption>Períodes tarifaris</caption>
+          <caption>{{ copy.tariff_periods }}</caption>
           <thead><tr><th>P1</th><th>P2</th><th>P3</th></tr></thead>
           <tbody>
             <tr class="data-row"><td>{{ "%.2f"|format(report.input.contracted_power_kw_by_periods.P1)|replace('.', ',') }}</td><td>{{ "%.2f"|format(report.input.contracted_power_kw_by_periods.P2)|replace('.', ',') }}</td><td></td></tr>
@@ -83,25 +83,25 @@
         </table>
       </div>
 
-      <h3 class="cost-title">Cost calculat amb la tarifa {{ report.pricing.tariff_name }}</h3>
+      <h3 class="cost-title">{{ copy.invoice_cost.format(tariff_name=report.pricing.tariff_name) }}</h3>
       <table class="costs">
-        <tr><td>Cost per la potència contractada</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.power_eur) }}</td></tr>
-        <tr><td>Cost per l'energia utilitzada</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.energy_eur) }}</td></tr>
-        <tr><td>Compensació d'excedents</td><td class="rate"></td><td class="amount">{{ euro(-report.breakdown.costs.surplus_compensation_eur) }}</td></tr>
-        <tr><td>Cost Serveis d'Ajust</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.adjustment_services_eur) }}</td></tr>
-        <tr><td>Bo Social</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.social_bonus_eur) }}</td></tr>
-        <tr><td>Impost elèctric</td><td class="rate">{{ "%.2f"|format(report.input.electric_tax_rate_percent)|replace('.', ',') }}%</td><td class="amount">{{ euro(report.breakdown.costs.electric_tax_eur) }}</td></tr>
-        <tr><td>Cost del lloguer del comptador</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.meter_rental_eur) }}</td></tr>
+        <tr><td>{{ copy.power_cost }}</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.power_eur) }}</td></tr>
+        <tr><td>{{ copy.energy_cost }}</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.energy_eur) }}</td></tr>
+        <tr><td>{{ copy.surplus_compensation }}</td><td class="rate"></td><td class="amount">{{ euro(-report.breakdown.costs.surplus_compensation_eur) }}</td></tr>
+        <tr><td>{{ copy.adjustment_cost }}</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.adjustment_services_eur) }}</td></tr>
+        <tr><td>{{ copy.social_bonus }}</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.social_bonus_eur) }}</td></tr>
+        <tr><td>{{ copy.electric_tax }}</td><td class="rate">{{ "%.2f"|format(report.input.electric_tax_rate_percent)|replace('.', ',') }}%</td><td class="amount">{{ euro(report.breakdown.costs.electric_tax_eur) }}</td></tr>
+        <tr><td>{{ copy.meter_rental_cost }}</td><td class="rate"></td><td class="amount">{{ euro(report.breakdown.costs.meter_rental_eur) }}</td></tr>
         <tr><td>IVA</td><td class="rate">{{ "%.0f"|format(report.input.vat_rate_percent) }}%</td><td class="amount">{{ euro(report.breakdown.costs.vat_eur) }}</td></tr>
         <tr class="total"><td colspan="2">Total</td><td>{{ euro(report.comparison.som_total) }}</td></tr>
       </table>
 
       <div class="flux">
-        <p><span><strong>Import dels <a href="https://ca.support.somenergia.coop/article/1397-que-son-els-excedents-no-compensats">excedents no compensats</a></strong> (ajust límit de compensació)</span><span class="amount">{{ euro(report.breakdown.non_compensated_surplus_eur) }}</span></p>
-        <p><span><strong>Sols (€) acumulats al <a href="https://ca.support.somenergia.coop/article/1371-que-es-el-flux-solar">Flux Solar</a></strong>: el 80% de l'import dels excedents no compensats. Es descomptarà a les següents factures.</span><span class="amount">{{ euro(report.breakdown.flux_solar_eur) }}</span></p>
+        <p><span><strong>{{ copy.non_compensated_surplus.format(link='<a href="' ~ copy.non_compensated_surplus_url ~ '">' ~ copy.non_compensated_surplus_link ~ '</a>')|safe }}</strong></span><span class="amount">{{ euro(report.breakdown.non_compensated_surplus_eur) }}</span></p>
+        <p><span><strong>{{ copy.flux_solar.format(link='<a href="' ~ copy.flux_solar_url ~ '">' ~ copy.flux_solar_link ~ '</a>')|safe }}</strong></span><span class="amount">{{ euro(report.breakdown.flux_solar_eur) }}</span></p>
       </div>
-      <p class="notice">Aquesta simulació només és vàlida per aquesta factura i el resultat no és extrapolable a una altra factura ni tampoc al cost anual de la llum.</p>
-      <footer class="footer">Simulació factura Som Energia <span class="number">3</span></footer>
+      <p class="notice">{{ copy.notice }}</p>
+      <footer class="footer">{{ copy.footer }} <span class="number">3</span></footer>
     </main>
   </body>
 </html>
