@@ -8,6 +8,7 @@ const initialForm = {
   titular: '',
   billing_days: '',
   competitor_invoice_amount: '',
+  locale: 'ca',
   template_version: '',
   energy_by_periods: {
     P1: '',
@@ -174,6 +175,7 @@ function CompareScreen() {
       titular: form.titular,
       billing_days: numberOrEmpty(form.billing_days),
       competitor_invoice_amount: numberOrEmpty(form.competitor_invoice_amount),
+      locale: form.locale,
       energy_by_periods: {
         P1: numberOrEmpty(form.energy_by_periods.P1),
         P2: numberOrEmpty(form.energy_by_periods.P2),
@@ -366,6 +368,19 @@ function CompareScreen() {
             JSON
           </button>
         </div>
+
+        <section className="form-section">
+          <h2>Document</h2>
+          <label>
+            Idioma del PDF
+            <select value={form.locale} onChange={(event) => updateField('locale', event.target.value)}>
+              <option value="ca">Català</option>
+              <option value="es">Castellà</option>
+            </select>
+            <small className="field-help">Només afecta el PDF que es generarà.</small>
+            <FieldError error={errors.locale} />
+          </label>
+        </section>
 
         {inputMode === 'form' ? (
           <>

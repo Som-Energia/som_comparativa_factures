@@ -48,6 +48,7 @@ Endpoints:
 - `POST /api/invoices/extract-for-comparison`: rep un `multipart/form-data` amb el camp `pdf` i retorna les dades extretes, junt amb el payload preparat per a la comparativa. Disponible per a la interfície interna.
 - `POST /api/invoices/extract`: API externa protegida. Rep el mateix camp `pdf`, requereix `Authorization: Bearer <INVOICE_EXTRACTOR_API_TOKEN>` i retorna les dades extretes amb les claus del contracte de comparativa.
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
+  - Admet `locale: "ca"` (valor per defecte) o `locale: "es"` per escollir l'idioma del document.
 - `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
 - `GET /api/health`: healthcheck.
 
