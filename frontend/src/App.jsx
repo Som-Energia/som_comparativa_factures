@@ -227,40 +227,55 @@ function CompareScreen() {
     const body = new FormData()
     body.append('pdf', file)
 
-    const response = await fetch(`${apiBaseUrl}/invoices/extract-for-comparison`, {
-      method: 'POST',
-      body,
-    })
-    const data = await response.json()
-    setExtractingInvoice(false)
+    try {
+      const response = await fetch(`${apiBaseUrl}/invoices/extract-for-comparison`, {
+        method: 'POST',
+        body,
+      })
+      const isJsonResponse = response.headers.get('content-type')?.includes('application/json')
+      const data = isJsonResponse ? await response.json() : null
 
-    if (!response.ok) {
-      setErrors(data.errors || {})
-      return
+      if (!response.ok) {
+        if (response.status === 413) {
+          setErrors({ pdf: 'El PDF no pot superar els 10 MB.' })
+        } else {
+          setErrors(data?.errors || { pdf: 'No s\'ha pogut processar el PDF.' })
+        }
+        return
+      }
+
+      if (!data?.comparison_input || !data.extraction?.data_quality) {
+        setErrors({ pdf: 'El servei ha retornat una resposta invàlida.' })
+        return
+      }
+
+      const input = data.comparison_input
+      setForm((current) => ({
+        ...current,
+        cups: input.cups ?? '',
+        titular: input.titular ?? '',
+        billing_days: input.billing_days ?? '',
+        competitor_invoice_amount: input.competitor_invoice_amount ?? '',
+        energy_by_periods: {
+          P1: input.energy_by_periods.P1 ?? '',
+          P2: input.energy_by_periods.P2 ?? '',
+          P3: input.energy_by_periods.P3 ?? '',
+        },
+        contracted_power_kw_by_periods: {
+          P1: input.contracted_power_kw_by_periods.P1 ?? '',
+          P2: input.contracted_power_kw_by_periods.P2 ?? '',
+        },
+        self_consumption_surplus_kwh: input.self_consumption_surplus_kwh ?? '',
+        meter_rental_eur: input.meter_rental_eur ?? '',
+        vat_rate_percent: input.vat_rate_percent ?? '',
+        electric_tax_rate_percent: input.electric_tax_rate_percent ?? '',
+      }))
+      setExtractionIssues(data.extraction.data_quality.issues)
+    } catch {
+      setErrors({ pdf: 'No s\'ha pogut contactar amb el servei d\'extracció.' })
+    } finally {
+      setExtractingInvoice(false)
     }
-
-    const input = data.comparison_input
-    setForm((current) => ({
-      ...current,
-      cups: input.cups ?? '',
-      titular: input.titular ?? '',
-      billing_days: input.billing_days ?? '',
-      competitor_invoice_amount: input.competitor_invoice_amount ?? '',
-      energy_by_periods: {
-        P1: input.energy_by_periods.P1 ?? '',
-        P2: input.energy_by_periods.P2 ?? '',
-        P3: input.energy_by_periods.P3 ?? '',
-      },
-      contracted_power_kw_by_periods: {
-        P1: input.contracted_power_kw_by_periods.P1 ?? '',
-        P2: input.contracted_power_kw_by_periods.P2 ?? '',
-      },
-      self_consumption_surplus_kwh: input.self_consumption_surplus_kwh ?? '',
-      meter_rental_eur: input.meter_rental_eur ?? '',
-      vat_rate_percent: input.vat_rate_percent ?? '',
-      electric_tax_rate_percent: input.electric_tax_rate_percent ?? '',
-    }))
-    setExtractionIssues(data.extraction.data_quality.issues)
   }
 
   async function handlePreview(event) {
