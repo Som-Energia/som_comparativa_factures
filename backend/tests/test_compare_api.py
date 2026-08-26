@@ -43,14 +43,14 @@ def test_compare_returns_report_summary_for_valid_payload():
     }
     assert body["comparison"] == {
         "competitor_total": 54.0,
-        "som_total": 41.67,
-        "savings": 12.33,
+        "som_total": 41.59,
+        "savings": 12.41,
         "savings_label": "Estalvi",
     }
     assert len(body["breakdown"]["energy"]) == 3
     assert body["breakdown"]["totals"][-1] == {
         "label": "Total",
-        "amount": 41.67,
+        "amount": 41.59,
         "is_total": True,
     }
 
@@ -130,7 +130,7 @@ def test_compare_applies_surplus_compensation_beyond_energy_cost():
     assert body["breakdown"]["flux_solar_kwh"] == 0.0
 
 
-def test_compare_adds_adjustment_service_to_the_taxable_subtotal():
+def test_compare_excludes_adjustment_service_from_electric_tax_base():
     app = create_app()
     client = app.test_client()
 
@@ -164,9 +164,69 @@ def test_compare_adds_adjustment_service_to_the_taxable_subtotal():
     body = response.get_json()
     assert body["input"]["adjustment_service_eur_per_kwh"] == 0.01
     assert body["breakdown"]["costs"]["adjustment_services_eur"] == 1.0
-    assert round(body["breakdown"]["costs"]["electric_tax_eur"] - base["breakdown"]["costs"]["electric_tax_eur"], 2) == 0.05
-    assert round(body["breakdown"]["costs"]["vat_eur"] - base["breakdown"]["costs"]["vat_eur"], 2) == 0.22
-    assert round(body["comparison"]["som_total"] - base["comparison"]["som_total"], 2) == 1.27
+    assert round(body["breakdown"]["costs"]["electric_tax_eur"] - base["breakdown"]["costs"]["electric_tax_eur"], 2) == 0
+    assert round(body["breakdown"]["costs"]["vat_eur"] - base["breakdown"]["costs"]["vat_eur"], 2) == 0.21
+    assert round(body["comparison"]["som_total"] - base["comparison"]["som_total"], 2) == 1.21
+
+
+def test_compare_subtracts_surplus_compensation_from_electric_tax_base():
+    app = create_app()
+    client = app.test_client()
+
+    base_response = client.post(
+        "/api/compare",
+        json=build_payload(
+            billing_days=1,
+            energy_by_periods={"P1": 100, "P2": 0, "P3": 0},
+            contracted_power_kw_by_periods={"P1": 0, "P2": 0},
+            meter_rental_eur=0,
+            vat_rate_percent=0,
+            electric_tax_rate_percent=5,
+        ),
+    )
+    response = client.post(
+        "/api/compare",
+        json=build_payload(
+            billing_days=1,
+            energy_by_periods={"P1": 100, "P2": 0, "P3": 0},
+            contracted_power_kw_by_periods={"P1": 0, "P2": 0},
+            self_consumption_surplus_kwh=10,
+            meter_rental_eur=0,
+            vat_rate_percent=0,
+            electric_tax_rate_percent=5,
+        ),
+    )
+
+    assert base_response.status_code == 200
+    assert response.status_code == 200
+    base = base_response.get_json()
+    body = response.get_json()
+    assert base["breakdown"]["costs"]["electric_tax_eur"] == 1.13
+    assert body["breakdown"]["costs"]["electric_tax_eur"] == 1.12
+
+
+def test_compare_rounds_power_total_after_summing_periods():
+    client = create_app().test_client()
+
+    response = client.post(
+        "/api/compare",
+        json=build_payload(
+            billing_days=1,
+            energy_by_periods={"P1": 0, "P2": 0, "P3": 0},
+            contracted_power_kw_by_periods={"P1": 0.1, "P2": 0.75},
+            meter_rental_eur=0,
+            vat_rate_percent=0,
+            electric_tax_rate_percent=0,
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["breakdown"]["power"] == [
+        {"period": "P1", "kw": 0.1, "unit_price": 0.0820109589041096, "amount": 0.01},
+        {"period": "P2", "kw": 0.75, "unit_price": 0.0080958904109589, "amount": 0.01},
+    ]
+    assert body["breakdown"]["costs"]["power_eur"] == 0.01
 
 
 def test_compare_limits_total_to_zero_and_returns_flux_solar():
