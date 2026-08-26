@@ -53,16 +53,17 @@ def build_comparison_report(payload: dict) -> dict:
     power_total = Decimal("0")
     for period, kw in data.contracted_power_kw_by_periods.items():
         unit_price = Decimal(str(pricing["contracted_power_prices_eur_per_kw_day"].get(period, 0)))
-        period_total = _money(kw * unit_price * data.billing_days)
+        period_total = kw * unit_price * data.billing_days
         power_total += period_total
         power_breakdown.append(
             {
                 "period": period,
                 "kw": float(kw),
                 "unit_price": float(unit_price),
-                "amount": float(period_total),
+                "amount": float(_money(period_total)),
             }
         )
+    power_total = _money(power_total)
 
     adjustment_service = _money(sum(data.energy_by_periods.values()) * data.adjustment_service_eur_per_kwh)
     social_bonus = _money(Decimal(str(pricing["social_bonus_eur_per_day"])) * data.billing_days)
@@ -78,7 +79,8 @@ def build_comparison_report(payload: dict) -> dict:
     surplus_used_kwh = min(data.self_consumption_surplus_kwh, compensation_applied / surplus_price)
     flux_solar_kwh = _quantity(data.self_consumption_surplus_kwh - surplus_used_kwh)
     flux_solar_eur = _money(non_compensated_surplus * Decimal("0.80"))
-    electric_tax = _money(subtotal * data.electric_tax_rate)
+    electric_tax_base = power_total + energy_total - compensation_applied
+    electric_tax = _money(electric_tax_base * data.electric_tax_rate)
     vat_tax = _money((subtotal + electric_tax) * data.vat_rate)
     som_total = _money(subtotal + electric_tax + vat_tax)
     savings = _money(data.competitor_invoice_amount - som_total)
