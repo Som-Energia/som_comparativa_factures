@@ -31,7 +31,8 @@ small {
 .hero-card,
 .form-card,
 .summary-card,
-.editor-panel {
+.editor-panel,
+.pricing-card {
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(23, 70, 76, 0.08);
   border-radius: 24px;
@@ -84,7 +85,8 @@ small {
 
 .form-card,
 .summary-card,
-.editor-panel {
+.editor-panel,
+.pricing-card {
   padding: 24px;
 }
 
@@ -310,6 +312,42 @@ input:disabled {
 
 .summary-item strong {
   font-size: 1.4rem;
+}
+
+.pricing-content {
+  display: grid;
+  gap: 24px;
+  margin-top: 28px;
+}
+
+.pricing-summary,
+.pricing-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.pricing-summary > div,
+.pricing-list > div {
+  padding: 16px;
+  border-radius: 16px;
+  background: #f5f9ef;
+}
+
+.pricing-section h3 {
+  margin: 0 0 12px;
+}
+
+.pricing-summary dt,
+.pricing-list dt {
+  color: #486765;
+}
+
+.pricing-summary dd,
+.pricing-list dd {
+  margin: 6px 0 0;
+  font-weight: 700;
 }
 
 .mini-section {

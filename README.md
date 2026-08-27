@@ -50,6 +50,7 @@ Endpoints:
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
   - Admet `locale: "ca"` (valor per defecte) o `locale: "es"` per escollir l'idioma del document.
 - `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
+- `GET /api/pricing`: retorna la configuració de preus activa que s'aplica als càlculs.
 - `GET /api/health`: healthcheck.
 
 Exemple de crida externa:

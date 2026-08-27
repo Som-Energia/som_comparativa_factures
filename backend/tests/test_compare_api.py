@@ -67,6 +67,30 @@ def test_comparison_input_defaults_returns_adjustment_service_price():
     }
 
 
+def test_pricing_returns_the_configuration_used_for_calculations():
+    client = create_app().test_client()
+
+    response = client.get("/api/pricing")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "tariff_name": "2.0TD Periodes",
+        "effective_date": "2026-05-01",
+        "currency": "EUR",
+        "energy_prices_eur_per_kwh": {"P1": 0.226, "P2": 0.15, "P3": 0.124},
+        "contracted_power_prices_eur_per_kw_day": {
+            "P1": 0.0820109589041096,
+            "P2": 0.0080958904109589,
+        },
+        "self_consumption_surplus_price_eur_per_kwh": 0.03,
+        "adjustment_service_eur_per_kwh": 0.019,
+        "social_bonus_eur_per_day": 0.024688,
+        "meter_rental_eur": 0.81,
+        "electric_tax_rate": 0.0511269632,
+        "vat_rate": 0.21,
+    }
+
+
 def test_compare_returns_validation_errors_for_invalid_payload():
     app = create_app()
     client = app.test_client()
