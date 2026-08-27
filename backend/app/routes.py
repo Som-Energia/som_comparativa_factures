@@ -65,6 +65,11 @@ def comparison_input_defaults():
     }
 
 
+@api.get("/pricing")
+def pricing():
+    return jsonify(load_pricing_config())
+
+
 @api.post("/compare")
 def compare():
     payload = request.get_json(silent=True) or {}

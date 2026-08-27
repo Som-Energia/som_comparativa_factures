@@ -47,13 +47,18 @@ function App() {
           <button type="button" className={screen === 'compare' ? '' : 'tertiary'} onClick={() => setScreen('compare')}>
             Comparativa
           </button>
+          <button type="button" className={screen === 'pricing' ? '' : 'tertiary'} onClick={() => setScreen('pricing')}>
+            Preus
+          </button>
           <button type="button" className={screen === 'templates' ? '' : 'tertiary'} onClick={() => setScreen('templates')}>
             Editor de plantilles
           </button>
         </div>
       </section>
 
-      {screen === 'compare' ? <CompareScreen /> : <TemplateEditorScreen />}
+      {screen === 'compare' && <CompareScreen />}
+      {screen === 'templates' && <TemplateEditorScreen />}
+      {screen === 'pricing' && <PricingScreen />}
     </main>
   )
 }
@@ -665,6 +670,103 @@ function CompareScreen() {
   )
 }
 
+function PricingScreen() {
+  const [pricing, setPricing] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPricing() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/pricing`)
+        if (!response.ok) {
+          throw new Error()
+        }
+
+        const data = await response.json()
+        if (!cancelled) {
+          setPricing(data)
+        }
+      } catch {
+        if (!cancelled) {
+          setError('No s’han pogut carregar els preus.')
+        }
+      }
+    }
+
+    loadPricing()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <section className="pricing-card">
+      <div className="section-heading-row">
+        <div>
+          <p className="eyebrow">Configuració activa</p>
+          <h2>Preus de Som Energia</h2>
+        </div>
+        {pricing && <span className="published-pill">Vigents des de {pricing.effective_date}</span>}
+      </div>
+      <p className="section-copy">Aquests són els preus que s’apliquen als càlculs de la comparativa.</p>
+
+      {error && <p className="field-error">{error}</p>}
+      {!pricing && !error && <p className="placeholder">Carregant preus...</p>}
+
+      {pricing && (
+        <div className="pricing-content">
+          <dl className="pricing-summary">
+            <div>
+              <dt>Tarifa</dt>
+              <dd>{pricing.tariff_name}</dd>
+            </div>
+          </dl>
+
+          <PricingSection title="Energia" unit="EUR/kWh" prices={pricing.energy_prices_eur_per_kwh} />
+          <PricingSection title="Potència contractada" unit="EUR/kW/dia" prices={pricing.contracted_power_prices_eur_per_kw_day} />
+
+          <section className="pricing-section">
+            <h3>Altres conceptes</h3>
+            <dl className="pricing-list">
+              <PricingItem label="Compensació d’excedents" value={pricing.self_consumption_surplus_price_eur_per_kwh} unit="EUR/kWh" />
+              <PricingItem label="Servei d’ajust" value={pricing.adjustment_service_eur_per_kwh} unit="EUR/kWh" />
+              <PricingItem label="Bo social" value={pricing.social_bonus_eur_per_day} unit="EUR/dia" />
+              <PricingItem label="Lloguer del comptador" value={pricing.meter_rental_eur} unit="EUR" />
+              <PricingItem label="Impost elèctric" value={pricing.electric_tax_rate * 100} unit="%" />
+              <PricingItem label="IVA" value={pricing.vat_rate * 100} unit="%" />
+            </dl>
+          </section>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function PricingSection({ title, unit, prices }) {
+  return (
+    <section className="pricing-section">
+      <h3>{title}</h3>
+      <dl className="pricing-list">
+        {Object.entries(prices).map(([period, value]) => (
+          <PricingItem key={period} label={period} value={value} unit={unit} />
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+function PricingItem({ label, value, unit }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{formatPricingValue(value)} {unit}</dd>
+    </div>
+  )
+}
+
 function TemplateEditorScreen() {
   const [versions, setVersions] = useState([])
   const [publishedVersion, setPublishedVersion] = useState('')
@@ -998,6 +1100,12 @@ function formatKwh(amount) {
   return new Intl.NumberFormat('ca-ES', {
     maximumFractionDigits: 2,
   }).format(amount) + ' kWh'
+}
+
+function formatPricingValue(value) {
+  return new Intl.NumberFormat('ca-ES', {
+    maximumFractionDigits: 16,
+  }).format(value)
 }
 
 export default App
