@@ -317,6 +317,8 @@ def build_extraction():
         "meter_rental_eur": 0.81,
         "vat_amount": 11.34,
         "vat_rate_percent": 21.0,
+        "igic_lines": [],
+        "igic_total_eur": None,
         "electricity_tax": 1.35,
         "electric_tax_rate_percent": 5.11,
         "self_consumption_surplus_kwh": None,

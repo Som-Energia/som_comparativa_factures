@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from pathlib import Path
 
-from app.services.invoice_extractor import extract_billing_days, extract_contracted_powers, extract_directory, extract_electricity_tax, extract_electricity_tax_rate, extract_energy_by_periods, extract_from_text, extract_meter_rental, extract_surplus_kwh, extract_titular, extract_total_amount, extract_vat_amount, extract_vat_rate, normalize_number
+from app.services.invoice_extractor import extract_billing_days, extract_contracted_powers, extract_directory, extract_electricity_tax, extract_electricity_tax_rate, extract_energy_by_periods, extract_from_text, extract_igic, extract_meter_rental, extract_surplus_kwh, extract_titular, extract_total_amount, extract_vat_amount, extract_vat_rate, normalize_number
 
 # All fixtures in this file are synthetic. Never add customer invoice data here.
 
@@ -203,6 +203,26 @@ class ExtractionTests(unittest.TestCase):
 
     def test_extracts_vat_rate_reduced(self):
         self.assertEqual(extract_vat_rate("IVA (10%) 100,00 €  x 10%  10,00 €"), 10.0)
+
+    def test_extracts_endesa_igic_lines_and_total(self):
+        text = """
+        IGIC reducido 0 % s/ 1,09 .....................................................................................
+        0,00 €
+        IGIC reducido 0% s/ 133,44 .................................................................................. 0,00 € Lectura Lectura
+        IGIC normal 7 % s/ 1,52 ......................................................................................... 0,11 € real real
+        """
+
+        lines, total = extract_igic(text)
+
+        self.assertEqual(
+            lines,
+            [
+                {"name": "reducido", "percent": 0.0, "taxable_base_eur": 1.09, "amount_eur": 0.0},
+                {"name": "reducido", "percent": 0.0, "taxable_base_eur": 133.44, "amount_eur": 0.0},
+                {"name": "normal", "percent": 7.0, "taxable_base_eur": 1.52, "amount_eur": 0.11},
+            ],
+        )
+        self.assertEqual(total, 0.11)
 
     def test_extracts_electricity_tax_rate_endesa(self):
         text = "Impuesto electricidad ( 190,41 Eur X 5,1 %) .......................................................9,71 €"
