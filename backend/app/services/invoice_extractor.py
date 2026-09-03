@@ -89,6 +89,8 @@ def empty_result() -> dict[str, Any]:
         "meter_rental_eur": None,
         "vat_amount": None,
         "vat_rate_percent": None,
+        "igic_lines": [],
+        "igic_total_eur": None,
         "electricity_tax": None,
         "electric_tax_rate_percent": None,
         "self_consumption_surplus_kwh": None,
@@ -763,6 +765,27 @@ def extract_vat_rate(text: str) -> float | None:
     return None
 
 
+def extract_igic(text: str) -> tuple[list[dict[str, float | str]], float | None]:
+    lines = []
+    for match in re.finditer(
+        rf"^\s*igic\s+(?P<name>[^\d%\n]+?)\s+(?P<percent>\d{{1,3}}(?:[.,]\d+)?)\s*%\s*"
+        rf"s/\s*(?P<taxable_base>{AMOUNT_PATTERN[1:-1]})\s*\.{{2,}}\s*"
+        rf"(?P<amount>-?{AMOUNT_PATTERN[1:-1]})\s*€",
+        text,
+        re.IGNORECASE | re.MULTILINE,
+    ):
+        lines.append(
+            {
+                "name": match.group("name").strip().casefold(),
+                "percent": normalize_number(match.group("percent")),
+                "taxable_base_eur": normalize_number(match.group("taxable_base")),
+                "amount_eur": normalize_number(match.group("amount")),
+            }
+        )
+
+    return lines, sum(line["amount_eur"] for line in lines) if lines else None
+
+
 def extract_electricity_tax_rate(text: str) -> float | None:
     # Endesa / E21: "Impuesto electricidad ( NNN Eur X N,N% )"
     m = re.search(
@@ -1044,6 +1067,7 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     result["meter_rental_eur"] = extract_meter_rental(text)
     result["vat_amount"] = extract_vat_amount(text)
     result["vat_rate_percent"] = extract_vat_rate(text)
+    result["igic_lines"], result["igic_total_eur"] = extract_igic(text)
     result["electricity_tax"] = extract_electricity_tax(text)
     result["electric_tax_rate_percent"] = extract_electricity_tax_rate(text)
     result["self_consumption_surplus_kwh"] = extract_surplus_kwh(text)

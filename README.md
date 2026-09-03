@@ -76,6 +76,11 @@ La resposta inclou les claus del contracte d'entrada de comparativa i conserva d
   "meter_rental_eur": 0.81,
   "vat_amount": 11.34,
   "vat_rate_percent": 21.0,
+  "igic_lines": [
+    {"name": "reducido", "percent": 0.0, "taxable_base_eur": 1.09, "amount_eur": 0.0},
+    {"name": "normal", "percent": 7.0, "taxable_base_eur": 1.52, "amount_eur": 0.11}
+  ],
+  "igic_total_eur": 0.11,
   "electricity_tax": 1.35,
   "electric_tax_rate_percent": 5.11,
   "data_quality": {"status": "verified", "issues": []}
