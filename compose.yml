@@ -23,6 +23,26 @@ services:
       restart_policy:
         condition: any
 
+  pricing-sync:
+    image: "${BACKEND_IMAGE:?Set BACKEND_IMAGE}"
+    command: ["python", "run_pricing_sync.py"]
+    environment:
+      OOOP_USER: "${OOOP_USER:?Set OOOP_USER}"
+      OOOP_PWD: "${OOOP_PWD:?Set OOOP_PWD}"
+      OOOP_DBNAME: "${OOOP_DBNAME:?Set OOOP_DBNAME}"
+      OOOP_URI: "${OOOP_URI:?Set OOOP_URI}"
+      OOOP_PORT: "${OOOP_PORT:?Set OOOP_PORT}"
+      TARIFF_MUNICIPI_ID: "${TARIFF_MUNICIPI_ID:-28}"
+    volumes:
+      - /mnt/data/docker/comparativa/config:/app/config
+      - /mnt/data/docker/comparativa/assets:/app/assets
+    deploy:
+      placement:
+        constraints:
+          - "node.hostname == ${BACKEND_NODE_HOSTNAME:?Set BACKEND_NODE_HOSTNAME}"
+      restart_policy:
+        condition: any
+
   frontend:
     image: "${FRONTEND_IMAGE:?Set FRONTEND_IMAGE}"
     networks:

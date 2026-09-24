@@ -707,11 +707,11 @@ function PricingScreen() {
       <div className="section-heading-row">
         <div>
           <p className="eyebrow">Configuració activa</p>
-          <h2>Preus de Som Energia</h2>
+          <h2>Preus utilitzats per a la comparativa</h2>
         </div>
         {pricing && <span className="published-pill">Vigents des de {pricing.effective_date}</span>}
       </div>
-      <p className="section-copy">Aquests són els preus que s’apliquen als càlculs de la comparativa.</p>
+      <p className="section-copy">Aquests són els preus de tarifa que s’apliquen als càlculs de la comparativa.</p>
 
       {error && <p className="field-error">{error}</p>}
       {!pricing && !error && <p className="placeholder">Carregant preus...</p>}
@@ -732,11 +732,7 @@ function PricingScreen() {
             <h3>Altres conceptes</h3>
             <dl className="pricing-list">
               <PricingItem label="Compensació d’excedents" value={pricing.self_consumption_surplus_price_eur_per_kwh} unit="EUR/kWh" />
-              <PricingItem label="Servei d’ajust" value={pricing.adjustment_service_eur_per_kwh} unit="EUR/kWh" />
               <PricingItem label="Bo social" value={pricing.social_bonus_eur_per_day} unit="EUR/dia" />
-              <PricingItem label="Lloguer del comptador" value={pricing.meter_rental_eur} unit="EUR" />
-              <PricingItem label="Impost elèctric" value={pricing.electric_tax_rate * 100} unit="%" />
-              <PricingItem label="IVA" value={pricing.vat_rate * 100} unit="%" />
             </dl>
           </section>
         </div>

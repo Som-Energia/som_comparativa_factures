@@ -76,7 +76,11 @@ def build_comparison_report(payload: dict) -> dict:
     compensation_applied = min(compensation_requested, subtotal_before_compensation)
     non_compensated_surplus = _money(compensation_requested - compensation_applied)
     subtotal = subtotal_before_compensation - compensation_applied
-    surplus_used_kwh = min(data.self_consumption_surplus_kwh, compensation_applied / surplus_price)
+    surplus_used_kwh = (
+        min(data.self_consumption_surplus_kwh, compensation_applied / surplus_price)
+        if surplus_price > 0
+        else Decimal("0")
+    )
     flux_solar_kwh = _quantity(data.self_consumption_surplus_kwh - surplus_used_kwh)
     flux_solar_eur = _money(non_compensated_surplus * Decimal("0.80"))
     electric_tax_base = power_total + energy_total - compensation_applied
