@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 import re
 from shutil import copytree
@@ -62,10 +61,21 @@ MAX_ASSET_SIZE_BYTES = 2 * 1024 * 1024
 TEMPLATE_VERSION_PATTERN = re.compile(r"^v([1-9][0-9]*)$")
 
 
-@lru_cache(maxsize=1)
 def load_pricing_config() -> dict:
-    with (CONFIG_DIR / "pricing.json").open("r", encoding="utf-8") as handle:
+    with _pricing_path().open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def update_pricing_config(updated_fields: dict[str, Any]) -> dict:
+    """Persist validated ERP pricing without replacing form-controlled defaults."""
+    pricing = load_pricing_config()
+    pricing.update(updated_fields)
+    _write_json_atomic(_pricing_path(), pricing)
+    return pricing
+
+
+def _pricing_path() -> Path:
+    return CONFIG_DIR / "pricing.json"
 
 
 def resolve_comparison_template_bundle(version: str | None = None) -> TemplateBundle:
@@ -375,22 +385,26 @@ def _load_published_template_version(template_dir: Path) -> str:
 
 def _write_published_template_version(template_dir: Path, version: str) -> None:
     published_path = template_dir / "published.json"
+    _write_json_atomic(published_path, {"current_version": version})
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     with tempfile.NamedTemporaryFile(
         mode="w",
         encoding="utf-8",
-        dir=template_dir,
-        prefix=".published-",
-        suffix=".json",
+        dir=path.parent,
+        prefix=f".{path.stem}-",
+        suffix=path.suffix,
         delete=False,
     ) as handle:
-        json.dump({"current_version": version}, handle, indent=2)
+        json.dump(payload, handle, indent=2)
         handle.write("\n")
         handle.flush()
         os.fsync(handle.fileno())
         temporary_path = Path(handle.name)
 
     try:
-        os.replace(temporary_path, published_path)
+        os.replace(temporary_path, path)
     finally:
         temporary_path.unlink(missing_ok=True)
 

@@ -6,7 +6,7 @@ MVP per generar una comparativa de factura amb Som Energia a partir d'un formula
 
 - `frontend/`: React + Vite, formulari d'una sola pantalla i resum previ.
 - `backend/`: Flask API amb validacio, calcul i render HTML a PDF.
-- `backend/config/pricing.json`: configuracio de preus, impostos i literals de tarifa.
+- `backend/config/pricing.json`: font de veritat dels preus de tarifa, actualitzada diariament des de l'ERP.
 - `backend/config/pdf_templates/comparison/published.json`: punter de la versio activa del template.
 - `backend/config/pdf_templates/comparison/versions/v1/`: contracte editable de `content.yaml`, `theme.yaml` i `assets.yaml`.
 
@@ -50,7 +50,7 @@ Endpoints:
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
   - Admet `locale: "ca"` (valor per defecte) o `locale: "es"` per escollir l'idioma del document.
 - `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
-- `GET /api/pricing`: retorna la configuració de preus activa que s'aplica als càlculs.
+- `GET /api/pricing`: retorna la configuració de preus activa que s'aplica als càlculs, incloent la data efectiva i la darrera sincronització ERP.
 - `GET /api/health`: healthcheck.
 
 Exemple de crida externa:
@@ -163,6 +163,23 @@ docker login harbor.somenergia.coop
   harbor.somenergia.coop/comparativa/comparativa-frontend
 ```
 
-Enganxeu `compose.yml` com a Stack a Portainer, afegiu les sis variables i desplegueu-lo. El fitxer esta preparat per Docker Swarm: les etiquetes de Traefik viuen al servei i el backend queda fixat al node indicat per `BACKEND_NODE_HOSTNAME`. Les dades persistents es desen al host sota `/mnt/data/docker/comparativa/`: `config/` conserva les plantilles i la versio publicada, i `assets/` conserva els seus recursos. En el primer arrencada, el backend inicialitza directoris buits amb la configuracio inclosa a la imatge. A cada arrencada, `pricing.json` s'actualitza des de la imatge publicada; les plantilles persistents no se sobreescriuen.
+Enganxeu `compose.yml` com a Stack a Portainer, afegiu les variables i desplegueu-lo. El fitxer esta preparat per Docker Swarm: les etiquetes de Traefik viuen al servei i el backend queda fixat al node indicat per `BACKEND_NODE_HOSTNAME`. Les dades persistents es desen al host sota `/mnt/data/docker/comparativa/`: `config/` conserva les plantilles, la versio publicada i `pricing.json`; `assets/` conserva els seus recursos. En el primer arrencada, el backend inicialitza directoris buits amb la configuracio inclosa a la imatge. Despres, `pricing.json` no se sobreescriu durant reinicis ni desplegaments.
+
+### Sincronitzacio de preus ERP
+
+El servei intern `pricing-sync` consulta diariament a les 00:10, en hora `Europe/Madrid`, la tarifa `2.0TD` de l'ERP per a la data situada 31 dies en el futur. La tarifa futura ja publicada s'aplica immediatament a la comparativa; `effective_date` n'indica la data d'entrada en vigor. Si la consulta falla o retorna dades invalides, es conserva l'ultim `pricing.json` valid.
+
+El servei requereix aquestes variables addicionals, que nomes s'injecten a `pricing-sync`:
+
+| Variable | Exemple | Descripcio |
+| --- | --- | --- |
+| `OOOP_USER` | `comparativa` | Usuari de lectura de l'ERP. |
+| `OOOP_PWD` | valor secret | Contrasenya de l'usuari ERP. |
+| `OOOP_DBNAME` | `somenergia` | Base de dades OpenERP. |
+| `OOOP_URI` | `https://erp.example.org` | URL base de l'ERP. |
+| `OOOP_PORT` | `443` | Port XML-RPC de l'ERP. |
+| `TARIFF_MUNICIPI_ID` | `28` | Municipi de referencia per als preus peninsulars. Valor per defecte: `28`. |
+
+No deseu les credencials ERP al repositori ni als logs. Aquesta primera fase sincronitza nomes els imports de tarifa que aplica directament el calcul: energia, potencia, compensacio d'excedents i bo social. Els serveis d'ajust, el lloguer de comptador i els impostos continuen venint del formulari o de l'extraccio de factura.
 
 L'aplicacio no incorpora autenticacio: l'accés ha d'estar restringit per la VPN de l'organitzacio. Qualsevol usuari de la VPN pot gestionar les plantilles publicades.
