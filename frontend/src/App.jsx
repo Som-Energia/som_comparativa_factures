@@ -389,19 +389,6 @@ function CompareScreen() {
           </button>
         </div>
 
-        <section className="form-section">
-          <h2>Document</h2>
-          <label>
-            Idioma del PDF
-            <select value={form.locale} onChange={(event) => updateField('locale', event.target.value)}>
-              <option value="ca">Català</option>
-              <option value="es">Castellà</option>
-            </select>
-            <small className="field-help">Només afecta el PDF que es generarà.</small>
-            <FieldError error={errors.locale} />
-          </label>
-        </section>
-
         {inputMode === 'form' ? (
           <>
         <section className="form-section">
@@ -418,83 +405,111 @@ function CompareScreen() {
           )}
         </section>
         <section className="form-section">
+          <h2>Document</h2>
+          <div className="two-column-grid">
+            <label>
+              Idioma del PDF
+              <select value={form.locale} onChange={(event) => updateField('locale', event.target.value)}>
+                <option value="ca">Català</option>
+                <option value="es">Castellà</option>
+              </select>
+              <small className="field-help">Només afecta el PDF que es generarà.</small>
+              <FieldError error={errors.locale} />
+            </label>
+            <label>
+              Versio de plantilla (opcional)
+              <input
+                value={form.template_version}
+                onChange={(event) => updateField('template_version', event.target.value)}
+                placeholder="Versió publicada"
+              />
+              <small className="field-help">
+                Es carrega la versió publicada i la podeu canviar si cal.
+              </small>
+              <FieldError error={errors.template_version} />
+            </label>
+          </div>
+        </section>
+        <section className="form-section">
           <h2>Titular i contracte</h2>
-          <label>
-            Titular
-            <input
-              name="titular"
-              autoComplete="name"
-              value={form.titular}
-              onChange={(event) => updateField('titular', event.target.value)}
-            />
-            <FieldError error={errors.titular} />
-          </label>
-          <label>
-            CUPS
-            <input
-              name="cups"
-              autoComplete="on"
-              value={form.cups}
-              onChange={(event) => updateField('cups', event.target.value)}
-            />
-            <FieldError error={errors.cups} />
-          </label>
+          <div className="two-column-grid">
+            <label>
+              Titular
+              <input
+                name="titular"
+                autoComplete="name"
+                value={form.titular}
+                onChange={(event) => updateField('titular', event.target.value)}
+              />
+              <FieldError error={errors.titular} />
+            </label>
+            <label>
+              CUPS
+              <input
+                name="cups"
+                autoComplete="on"
+                value={form.cups}
+                onChange={(event) => updateField('cups', event.target.value)}
+              />
+              <FieldError error={errors.cups} />
+            </label>
+          </div>
         </section>
 
         <section className="form-section">
           <h2>Dades de la factura</h2>
-          <label>
-            Dies d'energia facturada
-            <input
-              type="number"
-              name="billing_days"
-              autoComplete="on"
-              min="1"
-              value={form.billing_days}
-              onChange={(event) => updateField('billing_days', event.target.value)}
-            />
-            <FieldError error={errors.billing_days} />
-          </label>
-          <label>
-            Import factura competència
-            <input
-              type="number"
-              name="competitor_invoice_amount"
-              autoComplete="on"
-              min="0"
-              step="0.01"
-              value={form.competitor_invoice_amount}
-              onChange={(event) => updateField('competitor_invoice_amount', event.target.value)}
-            />
-            <FieldError error={errors.competitor_invoice_amount} />
-          </label>
-          <label>
-            Servei d'ajust (EUR/kWh)
-            <input
-              type="number"
-              name="adjustment_service_eur_per_kwh"
-              autoComplete="on"
-              min="0"
-              step="0.000001"
-              value={form.adjustment_service_eur_per_kwh}
-              onChange={(event) => updateField('adjustment_service_eur_per_kwh', event.target.value)}
-            />
-            <FieldError error={errors.adjustment_service_eur_per_kwh} />
-          </label>
-          <label>
-            Lloguer del comptador (EUR)
-            <input
-              type="number"
-              name="meter_rental_eur"
-              autoComplete="on"
-              min="0"
-              step="0.01"
-              value={form.meter_rental_eur}
-              onChange={(event) => updateField('meter_rental_eur', event.target.value)}
-            />
-            <FieldError error={errors.meter_rental_eur} />
-          </label>
-          <div className="two-column-grid">
+          <div className="three-column-grid">
+            <label>
+              Import factura competència
+              <input
+                type="number"
+                name="competitor_invoice_amount"
+                autoComplete="on"
+                min="0"
+                step="0.01"
+                value={form.competitor_invoice_amount}
+                onChange={(event) => updateField('competitor_invoice_amount', event.target.value)}
+              />
+              <FieldError error={errors.competitor_invoice_amount} />
+            </label>
+            <label>
+              Dies d'energia facturada
+              <input
+                type="number"
+                name="billing_days"
+                autoComplete="on"
+                min="1"
+                value={form.billing_days}
+                onChange={(event) => updateField('billing_days', event.target.value)}
+              />
+              <FieldError error={errors.billing_days} />
+            </label>
+            <label>
+              Servei d'ajust (EUR/kWh)
+              <input
+                type="number"
+                name="adjustment_service_eur_per_kwh"
+                autoComplete="on"
+                min="0"
+                step="0.000001"
+                value={form.adjustment_service_eur_per_kwh}
+                onChange={(event) => updateField('adjustment_service_eur_per_kwh', event.target.value)}
+              />
+              <FieldError error={errors.adjustment_service_eur_per_kwh} />
+            </label>
+            <label>
+              Lloguer del comptador (EUR)
+              <input
+                type="number"
+                name="meter_rental_eur"
+                autoComplete="on"
+                min="0"
+                step="0.01"
+                value={form.meter_rental_eur}
+                onChange={(event) => updateField('meter_rental_eur', event.target.value)}
+              />
+              <FieldError error={errors.meter_rental_eur} />
+            </label>
             <label>
               IVA (%)
               <input
@@ -524,22 +539,10 @@ function CompareScreen() {
               <FieldError error={errors.electric_tax_rate_percent} />
             </label>
           </div>
-          <label>
-            Versio de plantilla (opcional)
-            <input
-              value={form.template_version}
-              onChange={(event) => updateField('template_version', event.target.value)}
-              placeholder="Versió publicada"
-            />
-            <small className="field-help">
-              Es carrega la versió publicada i la podeu canviar si cal.
-            </small>
-            <FieldError error={errors.template_version} />
-          </label>
         </section>
 
         <section className="form-section">
-          <h2>Potència i autoconsum</h2>
+          <h2>Potència contractada</h2>
           <div className="two-column-grid">
             {['P1', 'P2'].map((period) => (
               <label key={period}>
@@ -557,23 +560,10 @@ function CompareScreen() {
               </label>
             ))}
           </div>
-          <label>
-            Excedents d'autoconsum (kWh)
-            <input
-              type="number"
-              name="self_consumption_surplus_kwh"
-              autoComplete="on"
-              min="0"
-              step="0.01"
-              value={form.self_consumption_surplus_kwh}
-              onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
-            />
-            <FieldError error={errors.self_consumption_surplus_kwh} />
-          </label>
         </section>
 
         <section className="form-section">
-          <h2>Consum per períodes</h2>
+          <h2>Energia</h2>
           <div className="period-grid">
             {['P1', 'P2', 'P3'].map((period) => (
               <label key={period}>
@@ -591,6 +581,19 @@ function CompareScreen() {
               </label>
             ))}
           </div>
+          <label>
+            Excedents d'autoconsum (kWh)
+            <input
+              type="number"
+              name="self_consumption_surplus_kwh"
+              autoComplete="on"
+              min="0"
+              step="0.01"
+              value={form.self_consumption_surplus_kwh}
+              onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
+            />
+            <FieldError error={errors.self_consumption_surplus_kwh} />
+          </label>
         </section>
 
           </>
