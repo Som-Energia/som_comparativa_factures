@@ -219,6 +219,12 @@ textarea {
   gap: 16px;
 }
 
+.three-column-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .input-mode-switcher {
   display: flex;
   gap: 12px;
@@ -384,7 +390,12 @@ input:disabled {
 }
 
 @media (max-width: 900px) {
+  .two-column-grid {
+    grid-template-columns: 1fr;
+  }
+
   .period-grid,
+  .three-column-grid,
   .actions,
   .screen-switcher,
   .editor-toolbar,
