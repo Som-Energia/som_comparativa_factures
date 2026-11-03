@@ -6,6 +6,9 @@ import pytest
 from app import create_app
 
 
+pytestmark = pytest.mark.usefixtures("reference_pricing")
+
+
 def build_payload(**overrides):
     payload = {
         "cups": "ES0210002100000000ZN0F",

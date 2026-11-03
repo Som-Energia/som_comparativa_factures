@@ -2,9 +2,13 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import fitz
+import pytest
 
 from app import create_app
 from app.services import reporting
+
+
+pytestmark = pytest.mark.usefixtures("reference_pricing")
 
 
 def _payload():
