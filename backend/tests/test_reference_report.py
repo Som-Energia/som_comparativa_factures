@@ -42,7 +42,8 @@ def test_reference_template_pdf_preserves_static_pages_and_renders_calculation_p
     assert "Cost per l'energia utilitzada" in calculation_text
     assert "3,29 €" in calculation_text
     assert "Sols (€) acumulats al Flux Solar" in calculation_text
-    assert "19,15 €" in calculation_text
+    assert "28,00 €" in calculation_text
+    assert "14,01 €" in calculation_text
 
     links = calculation_page.get_links()
     assert {link["uri"] for link in links} == {
@@ -93,7 +94,8 @@ def test_reference_template_pdf_renders_spanish_calculation_page():
     assert "Persona de prova" in calculation_text
     assert "Coste por la energía utilizada" in calculation_text
     assert "Sols (€) acumulados en el Flux Solar" in calculation_text
-    assert "19,15 €" in calculation_text
+    assert "28,00 €" in calculation_text
+    assert "14,01 €" in calculation_text
     assert {link["uri"] for link in calculation_page.get_links()} == {
         "https://es.support.somenergia.coop/article/1398-que-son-los-excedentes-no-compensados",
         "https://es.support.somenergia.coop/article/1372-que-es-el-flux-solar",
