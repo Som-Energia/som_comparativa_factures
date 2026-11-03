@@ -9,7 +9,6 @@ const initialForm = {
   billing_days: '',
   competitor_invoice_amount: '',
   locale: 'ca',
-  audience: 'individual',
   template_version: '',
   energy_by_periods: {
     P1: '',
@@ -21,9 +20,33 @@ const initialForm = {
     P2: '',
   },
   self_consumption_surplus_kwh: '',
+  adjustment_service_eur_per_kwh: '',
   meter_rental_eur: '',
   vat_rate_percent: '21',
   electric_tax_rate_percent: '',
+}
+
+const reviewableFormFields = new Set([
+  'cups',
+  'titular',
+  'billing_days',
+  'competitor_invoice_amount',
+  'meter_rental_eur',
+  'vat_rate_percent',
+  'electric_tax_rate_percent',
+  'self_consumption_surplus_kwh',
+  'energy_by_periods.P1',
+  'energy_by_periods.P2',
+  'energy_by_periods.P3',
+  'contracted_power_kw_by_periods.P1',
+  'contracted_power_kw_by_periods.P2',
+])
+
+const extractionOnlyFieldLabels = {
+  retailer: 'comercialitzadora',
+  vat_amount: "import de l'IVA",
+  electricity_tax: 'impost elèctric',
+  'contracted_power_kw_by_periods.P3': 'potència contractada P3',
 }
 
 const initialTemplateFiles = {
@@ -38,6 +61,7 @@ function App() {
   return (
     <main className="page-shell">
       <section className="hero-card">
+        <img className="brand-logo" src="/logo.svg" alt="Som Energia" />
         <p className="eyebrow">MVP comparativa · {appVersion}</p>
         <h1>Simulacio de factura Som Energia</h1>
         <p className="hero-copy">
@@ -74,6 +98,7 @@ function CompareScreen() {
   const [openingHtmlPreview, setOpeningHtmlPreview] = useState(false)
   const [extractingInvoice, setExtractingInvoice] = useState(false)
   const [extractionIssues, setExtractionIssues] = useState([])
+  const [extractedFileName, setExtractedFileName] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -87,6 +112,9 @@ function CompareScreen() {
       const defaults = await response.json()
       setForm((current) => ({
         ...current,
+        adjustment_service_eur_per_kwh: current.adjustment_service_eur_per_kwh === ''
+          ? String(defaults.adjustment_service_eur_per_kwh)
+          : current.adjustment_service_eur_per_kwh,
         electric_tax_rate_percent: current.electric_tax_rate_percent === ''
           ? String(defaults.electric_tax_rate_percent)
           : current.electric_tax_rate_percent,
@@ -128,11 +156,17 @@ function CompareScreen() {
     }
   }, [])
 
+  function clearExtractionIssue(field) {
+    setExtractionIssues((current) => current.filter((issue) => issue.field !== field))
+  }
+
   function updateField(name, value) {
+    clearExtractionIssue(name)
     setForm((current) => ({ ...current, [name]: value }))
   }
 
   function updatePeriod(period, value) {
+    clearExtractionIssue(`energy_by_periods.${period}`)
     setForm((current) => ({
       ...current,
       energy_by_periods: {
@@ -143,6 +177,7 @@ function CompareScreen() {
   }
 
   function updatePowerPeriod(period, value) {
+    clearExtractionIssue(`contracted_power_kw_by_periods.${period}`)
     setForm((current) => ({
       ...current,
       contracted_power_kw_by_periods: {
@@ -163,7 +198,7 @@ function CompareScreen() {
         if (!payload || Array.isArray(payload)) {
           throw new Error('El JSON ha de contenir un objecte de comparativa.')
         }
-        return { ...payload, locale: form.locale, audience: form.audience }
+        return payload
       } catch (error) {
         if (error instanceof SyntaxError) {
           throw new Error('El JSON no és vàlid.')
@@ -178,7 +213,6 @@ function CompareScreen() {
       billing_days: numberOrEmpty(form.billing_days),
       competitor_invoice_amount: numberOrEmpty(form.competitor_invoice_amount),
       locale: form.locale,
-      audience: form.audience,
       energy_by_periods: {
         P1: numberOrEmpty(form.energy_by_periods.P1),
         P2: numberOrEmpty(form.energy_by_periods.P2),
@@ -189,6 +223,7 @@ function CompareScreen() {
         P2: numberOrEmpty(form.contracted_power_kw_by_periods.P2),
       },
       self_consumption_surplus_kwh: numberOrEmpty(form.self_consumption_surplus_kwh),
+      adjustment_service_eur_per_kwh: numberOrEmpty(form.adjustment_service_eur_per_kwh),
       meter_rental_eur: numberOrEmpty(form.meter_rental_eur),
       vat_rate_percent: numberOrEmpty(form.vat_rate_percent),
       electric_tax_rate_percent: numberOrEmpty(form.electric_tax_rate_percent),
@@ -222,10 +257,13 @@ function CompareScreen() {
     if (!file) {
       return
     }
+    // Permet tornar a triar el mateix fitxer, per exemple després d'un error.
+    event.target.value = ''
 
     setExtractingInvoice(true)
     setErrors({})
     setExtractionIssues([])
+    setExtractedFileName('')
     const body = new FormData()
     body.append('pdf', file)
 
@@ -273,6 +311,9 @@ function CompareScreen() {
         electric_tax_rate_percent: input.electric_tax_rate_percent ?? '',
       }))
       setExtractionIssues(data.extraction.data_quality.issues)
+      setExtractedFileName(file.name)
+      setInputMode('form')
+      setPreview(null)
     } catch {
       setErrors({ pdf: 'No s\'ha pogut contactar amb el servei d\'extracció.' })
     } finally {
@@ -374,259 +415,284 @@ function CompareScreen() {
     window.setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
+  const formIssueFields = new Set(
+    extractionIssues.map((issue) => issue.field).filter((field) => reviewableFormFields.has(field)),
+  )
+  const extractionOnlyIssues = extractionIssues.filter((issue) => !reviewableFormFields.has(issue.field))
+
   return (
     <div className="layout">
-      <form className="form-card" onSubmit={handlePreview} autoComplete="on">
-        <div className="input-mode-switcher" role="group" aria-label="Mode d'entrada">
-          <button type="button" className={inputMode === 'form' ? '' : 'tertiary'} onClick={() => changeInputMode('form')}>
-            Formulari
-          </button>
-          <button type="button" className={inputMode === 'json' ? '' : 'tertiary'} onClick={() => changeInputMode('json')}>
-            JSON
-          </button>
-        </div>
-
-        {inputMode === 'form' ? (
-          <>
-        <section className="form-section">
-          <h2>Carregar factura PDF</h2>
-          <p className="section-copy">Les dades extretes ompliran el formulari i podreu revisar-les abans de calcular.</p>
+      <div className="compare-column">
+        <section className="form-card invoice-upload">
+          <div className="section-heading-row">
+            <h2>Carregar factura PDF</h2>
+          </div>
+          <p className="section-copy">Opcional. Les dades extretes ompliran el formulari i podreu revisar-les abans de calcular.</p>
           <label>
             Factura PDF
             <input type="file" accept="application/pdf,.pdf" onChange={handleInvoiceUpload} disabled={extractingInvoice} />
             <FieldError error={errors.pdf} />
           </label>
           {extractingInvoice && <p className="field-help">Extraient dades de la factura...</p>}
-          {extractionIssues.length > 0 && (
-            <p className="field-help">Hi ha camps que cal revisar abans de calcular: {extractionIssues.map((issue) => issue.field).join(', ')}.</p>
+          {extractedFileName && <p className="status-message">{extractionSummary(extractedFileName, formIssueFields.size)}</p>}
+          {extractionOnlyIssues.length > 0 && (
+            <p className="field-help">
+              No s'ha pogut extreure, però no afecta el càlcul: {extractionOnlyIssues.map((issue) => extractionOnlyFieldLabels[issue.field] ?? issue.field).join(', ')}.
+            </p>
           )}
         </section>
-        <section className="form-section">
-          <h2>Titular i contracte</h2>
-          <div className="two-column-grid">
-            <label>
-              Titular
-              <input
-                name="titular"
-                autoComplete="name"
-                value={form.titular}
-                onChange={(event) => updateField('titular', event.target.value)}
-              />
-              <FieldError error={errors.titular} />
-            </label>
-            <label>
-              CUPS
-              <input
-                name="cups"
-                autoComplete="on"
-                value={form.cups}
-                onChange={(event) => updateField('cups', event.target.value)}
-              />
-              <FieldError error={errors.cups} />
-            </label>
-          </div>
-        </section>
 
-        <section className="form-section">
-          <h2>Dades de la factura</h2>
-          <div className="two-column-grid">
-            <label>
-              Import factura competència
-              <input
-                type="number"
-                name="competitor_invoice_amount"
-                autoComplete="on"
-                min="0"
-                step="0.01"
-                value={form.competitor_invoice_amount}
-                onChange={(event) => updateField('competitor_invoice_amount', event.target.value)}
-              />
-              <FieldError error={errors.competitor_invoice_amount} />
-            </label>
-            <label>
-              Dies d'energia facturada
-              <input
-                type="number"
-                name="billing_days"
-                autoComplete="on"
-                min="1"
-                value={form.billing_days}
-                onChange={(event) => updateField('billing_days', event.target.value)}
-              />
-              <FieldError error={errors.billing_days} />
-            </label>
+        <form className="form-card" onSubmit={handlePreview} autoComplete="on">
+          <div className="section-heading-row">
+            <h2>Dades de la comparativa</h2>
+            <div className="input-mode-switcher" role="group" aria-label="Mode d'entrada">
+              <button type="button" className={inputMode === 'form' ? '' : 'tertiary'} onClick={() => changeInputMode('form')}>
+                Formulari
+              </button>
+              <button type="button" className={inputMode === 'json' ? '' : 'tertiary'} onClick={() => changeInputMode('json')}>
+                JSON
+              </button>
+            </div>
           </div>
-          <div className="three-column-grid">
-            <label>
-              Lloguer del comptador (EUR)
-              <input
-                type="number"
-                name="meter_rental_eur"
-                autoComplete="on"
-                min="0"
-                step="0.01"
-                value={form.meter_rental_eur}
-                onChange={(event) => updateField('meter_rental_eur', event.target.value)}
-              />
-              <FieldError error={errors.meter_rental_eur} />
-            </label>
-            <label>
-              IVA (%)
-              <input
-                type="number"
-                name="vat_rate_percent"
-                autoComplete="on"
-                min="0"
-                max="100"
-                step="0.01"
-                value={form.vat_rate_percent}
-                onChange={(event) => updateField('vat_rate_percent', event.target.value)}
-              />
-              <FieldError error={errors.vat_rate_percent} />
-            </label>
-            <label>
-              IESE (%)
-              <input
-                type="number"
-                name="electric_tax_rate_percent"
-                autoComplete="on"
-                min="0"
-                max="100"
-                step="0.00000001"
-                value={form.electric_tax_rate_percent}
-                onChange={(event) => updateField('electric_tax_rate_percent', event.target.value)}
-              />
-              <FieldError error={errors.electric_tax_rate_percent} />
-            </label>
-          </div>
-        </section>
 
-        <section className="form-section">
-          <h2>Potència contractada</h2>
-          <div className="two-column-grid">
-            {['P1', 'P2'].map((period) => (
-              <label key={period}>
-                Potència contractada {period} (kW)
+          {inputMode === 'form' ? (
+            <>
+          <p className="section-copy">Ompliu les dades a mà o reviseu les extretes de la factura.</p>
+          <section className="form-section">
+            <h3>Titular i contracte</h3>
+            <div className="two-column-grid">
+              <label>
+                Titular
+                <input
+                  name="titular"
+                  autoComplete="name"
+                  value={form.titular}
+                  onChange={(event) => updateField('titular', event.target.value)}
+                />
+                <FieldError error={errors.titular} />
+                <FieldIssue issues={extractionIssues} field="titular" />
+              </label>
+              <label>
+                CUPS
+                <input
+                  name="cups"
+                  autoComplete="on"
+                  value={form.cups}
+                  onChange={(event) => updateField('cups', event.target.value)}
+                />
+                <FieldError error={errors.cups} />
+                <FieldIssue issues={extractionIssues} field="cups" />
+              </label>
+            </div>
+          </section>
+
+          <section className="form-section">
+            <h3>Dades de la factura</h3>
+            <div className="three-column-grid">
+              <label>
+                Import factura competència
                 <input
                   type="number"
-                  name={`contracted_power_kw_${period}`}
+                  name="competitor_invoice_amount"
                   autoComplete="on"
                   min="0"
                   step="0.01"
-                  value={form.contracted_power_kw_by_periods[period]}
-                  onChange={(event) => updatePowerPeriod(period, event.target.value)}
+                  value={form.competitor_invoice_amount}
+                  onChange={(event) => updateField('competitor_invoice_amount', event.target.value)}
                 />
-                <FieldError error={errors[`contracted_power_kw_by_periods.${period}`]} />
+                <FieldError error={errors.competitor_invoice_amount} />
+                <FieldIssue issues={extractionIssues} field="competitor_invoice_amount" />
               </label>
-            ))}
-          </div>
-        </section>
-
-        <section className="form-section">
-          <h2>Energia</h2>
-          <div className="period-grid">
-            {['P1', 'P2', 'P3'].map((period) => (
-              <label key={period}>
-                {period} (kWh)
+              <label>
+                Dies d'energia facturada
                 <input
                   type="number"
-                  name={`energy_kwh_${period}`}
+                  name="billing_days"
+                  autoComplete="on"
+                  min="1"
+                  value={form.billing_days}
+                  onChange={(event) => updateField('billing_days', event.target.value)}
+                />
+                <FieldError error={errors.billing_days} />
+                <FieldIssue issues={extractionIssues} field="billing_days" />
+              </label>
+              <label>
+                Lloguer del comptador (EUR)
+                <input
+                  type="number"
+                  name="meter_rental_eur"
                   autoComplete="on"
                   min="0"
-                  step="0.001"
-                  value={form.energy_by_periods[period]}
-                  onChange={(event) => updatePeriod(period, event.target.value)}
+                  step="0.01"
+                  value={form.meter_rental_eur}
+                  onChange={(event) => updateField('meter_rental_eur', event.target.value)}
                 />
-                <FieldError error={errors[`energy_by_periods.${period}`]} />
+                <FieldError error={errors.meter_rental_eur} />
+                <FieldIssue issues={extractionIssues} field="meter_rental_eur" />
               </label>
-            ))}
-          </div>
-          <label>
-            Excedents d'autoconsum (kWh)
-            <input
-              type="number"
-              name="self_consumption_surplus_kwh"
-              autoComplete="on"
-              min="0"
-              step="0.01"
-              value={form.self_consumption_surplus_kwh}
-              onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
-            />
-            <FieldError error={errors.self_consumption_surplus_kwh} />
-          </label>
-        </section>
+              <label>
+                IVA (%)
+                <input
+                  type="number"
+                  name="vat_rate_percent"
+                  autoComplete="on"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.vat_rate_percent}
+                  onChange={(event) => updateField('vat_rate_percent', event.target.value)}
+                />
+                <FieldError error={errors.vat_rate_percent} />
+                <FieldIssue issues={extractionIssues} field="vat_rate_percent" />
+              </label>
+              <label>
+                IESE (%)
+                <input
+                  type="number"
+                  name="electric_tax_rate_percent"
+                  autoComplete="on"
+                  min="0"
+                  max="100"
+                  step="0.00000001"
+                  value={form.electric_tax_rate_percent}
+                  onChange={(event) => updateField('electric_tax_rate_percent', event.target.value)}
+                />
+                <FieldError error={errors.electric_tax_rate_percent} />
+                <FieldIssue issues={extractionIssues} field="electric_tax_rate_percent" />
+              </label>
+            </div>
+          </section>
 
-          </>
-        ) : (
           <section className="form-section">
-            <h2>Entrada JSON</h2>
-            <p className="section-copy">
-              Enganxeu el payload de comparativa. Aquest serà el punt d’entrada per a una futura extracció de PDF a JSON.
-            </p>
+            <h3>Potència contractada</h3>
+            <div className="two-column-grid">
+              {['P1', 'P2'].map((period) => (
+                <label key={period}>
+                  Potència contractada {period} (kW)
+                  <input
+                    type="number"
+                    name={`contracted_power_kw_${period}`}
+                    autoComplete="on"
+                    min="0"
+                    step="0.01"
+                    value={form.contracted_power_kw_by_periods[period]}
+                    onChange={(event) => updatePowerPeriod(period, event.target.value)}
+                  />
+                  <FieldError error={errors[`contracted_power_kw_by_periods.${period}`]} />
+                  <FieldIssue issues={extractionIssues} field={`contracted_power_kw_by_periods.${period}`} />
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="form-section">
+            <h3>Energia</h3>
+            <div className="period-grid">
+              {['P1', 'P2', 'P3'].map((period) => (
+                <label key={period}>
+                  {period} (kWh)
+                  <input
+                    type="number"
+                    name={`energy_kwh_${period}`}
+                    autoComplete="on"
+                    min="0"
+                    step="0.001"
+                    value={form.energy_by_periods[period]}
+                    onChange={(event) => updatePeriod(period, event.target.value)}
+                  />
+                  <FieldError error={errors[`energy_by_periods.${period}`]} />
+                  <FieldIssue issues={extractionIssues} field={`energy_by_periods.${period}`} />
+                </label>
+              ))}
+            </div>
             <label>
-              JSON de la factura
-              <textarea
-                className="json-input"
-                name="raw_json"
-                autoComplete="off"
-                spellCheck="false"
-                value={rawJson}
-                onChange={(event) => setRawJson(event.target.value)}
-                placeholder={'{\n  "cups": "ES0210002100000000ZN0F",\n  "titular": "Persona Persona"\n}'}
+              Excedents d'autoconsum (kWh)
+              <input
+                type="number"
+                name="self_consumption_surplus_kwh"
+                autoComplete="on"
+                min="0"
+                step="0.01"
+                value={form.self_consumption_surplus_kwh}
+                onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
               />
-              <FieldError error={errors.raw_json} />
+              <FieldError error={errors.self_consumption_surplus_kwh} />
+              <FieldIssue issues={extractionIssues} field="self_consumption_surplus_kwh" />
             </label>
           </section>
-        )}
 
-        <section className="form-section">
-          <h2>Opcions del PDF</h2>
-          <p className="section-copy">Trieu el destinatari, l’idioma i la versió de plantilla del document abans de descarregar-lo.</p>
-          <div className="three-column-grid">
-            <label>
-              Tipus de PDF
-              <select value={form.audience} onChange={(event) => updateField('audience', event.target.value)}>
-                <option value="individual">Persona física</option>
-                <option value="business">Empresa o entitat</option>
-              </select>
-              <FieldError error={errors.audience} />
-            </label>
-            <label>
-              Idioma del PDF
-              <select value={form.locale} onChange={(event) => updateField('locale', event.target.value)}>
-                <option value="ca">Català</option>
-                <option value="es">Castellà</option>
-              </select>
-              <FieldError error={errors.locale} />
-            </label>
-            <label>
-              Versió de plantilla (opcional)
-              <input
-                value={form.template_version}
-                onChange={(event) => updateField('template_version', event.target.value)}
-                placeholder="Versió publicada"
-              />
-              <small className="field-help">
-                Es carrega la versió publicada i la podeu canviar si cal.
-              </small>
-              <FieldError error={errors.template_version} />
-            </label>
+            </>
+          ) : (
+            <section className="form-section">
+              <h3>Entrada JSON</h3>
+              <p className="section-copy">
+                Enganxeu el payload de comparativa. Aquest serà el punt d’entrada per a una futura extracció de PDF a JSON.
+              </p>
+              <label>
+                JSON de la factura
+                <textarea
+                  className="json-input"
+                  name="raw_json"
+                  autoComplete="off"
+                  spellCheck="false"
+                  value={rawJson}
+                  onChange={(event) => setRawJson(event.target.value)}
+                  placeholder={'{\n  "cups": "ES0210002100000000ZN0F",\n  "titular": "Persona Persona"\n}'}
+                />
+                <FieldError error={errors.raw_json} />
+              </label>
+            </section>
+          )}
+
+          <section className="form-section">
+            <h2>Opcions del PDF</h2>
+            <p className="section-copy">Trieu el destinatari, l’idioma i la versió de plantilla del document abans de descarregar-lo.</p>
+            <div className="three-column-grid">
+              <label>
+                Tipus de PDF
+                <select value={form.audience} onChange={(event) => updateField('audience', event.target.value)}>
+                  <option value="individual">Persona física</option>
+                  <option value="business">Empresa o entitat</option>
+                </select>
+                <FieldError error={errors.audience} />
+              </label>
+              <label>
+                Idioma del PDF
+                <select value={form.locale} onChange={(event) => updateField('locale', event.target.value)}>
+                  <option value="ca">Català</option>
+                  <option value="es">Castellà</option>
+                </select>
+                <FieldError error={errors.locale} />
+              </label>
+              <label>
+                Versió de plantilla (opcional)
+                <input
+                  value={form.template_version}
+                  onChange={(event) => updateField('template_version', event.target.value)}
+                  placeholder="Versió publicada"
+                />
+                <small className="field-help">
+                  Es carrega la versió publicada i la podeu canviar si cal.
+                </small>
+                <FieldError error={errors.template_version} />
+              </label>
+            </div>
+            <small className="field-help">Aquestes opcions afecten el document, no els imports de la comparativa.</small>
+          </section>
+
+          <div className="actions">
+            <button type="submit" disabled={loadingPreview}>
+              {loadingPreview ? 'Calculant...' : 'Veure resum'}
+            </button>
+            <button type="button" className="secondary" disabled={!preview || downloading} onClick={handleDownload}>
+              {downloading ? 'Generant PDF...' : 'Descarregar PDF'}
+            </button>
+            <button type="button" className="tertiary" disabled={openingHtmlPreview} onClick={handleOpenHtmlPreview}>
+              {openingHtmlPreview ? 'Obrint preview...' : 'Obrir preview HTML'}
+            </button>
           </div>
-          <small className="field-help">Aquestes opcions afecten el document, no els imports de la comparativa.</small>
-        </section>
-
-        <div className="actions">
-          <button type="submit" disabled={loadingPreview}>
-            {loadingPreview ? 'Calculant...' : 'Veure resum'}
-          </button>
-          <button type="button" className="secondary" disabled={!preview || downloading} onClick={handleDownload}>
-            {downloading ? 'Generant PDF...' : 'Descarregar PDF'}
-          </button>
-          <button type="button" className="tertiary" disabled={openingHtmlPreview} onClick={handleOpenHtmlPreview}>
-            {openingHtmlPreview ? 'Obrint preview...' : 'Obrir preview HTML'}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
 
       <aside className="summary-card">
         <h2>Resum</h2>
@@ -726,12 +792,6 @@ function PricingScreen() {
 
           <PricingSection title="Energia" unit="EUR/kWh" prices={pricing.energy_prices_eur_per_kwh} />
           <PricingSection title="Potència contractada" unit="EUR/kW/dia" prices={pricing.contracted_power_prices_eur_per_kw_day} />
-          <PricingSection title="Serveis d’ajust" unit="EUR/kWh" prices={pricing.adjustment_service_prices_eur_per_kwh} />
-          <p className="field-help">
-            {pricing.adjustment_service_price_date
-              ? `Data dels preus mitjans de l’ERP: ${pricing.adjustment_service_price_date}`
-              : 'Preus de la configuració anterior, pendents de la primera sincronització amb l’ERP.'}
-          </p>
 
           <section className="pricing-section">
             <h3>Altres conceptes</h3>
@@ -1050,6 +1110,26 @@ function TemplateEditorScreen() {
       </div>
     </section>
   )
+}
+
+function FieldIssue({ issues, field }) {
+  return issues
+    .filter((issue) => issue.field === field)
+    .map((issue) => (
+      <span key={issue.code} className="field-issue">
+        <strong>Reviseu aquest camp.</strong> {issue.message}
+      </span>
+    ))
+}
+
+function extractionSummary(fileName, issueCount) {
+  if (issueCount === 0) {
+    return `Dades extretes de ${fileName}. No hi ha cap camp pendent de revisar.`
+  }
+  if (issueCount === 1) {
+    return `Dades extretes de ${fileName}. Cal revisar 1 camp marcat al formulari.`
+  }
+  return `Dades extretes de ${fileName}. Cal revisar ${issueCount} camps marcats al formulari.`
 }
 
 function FieldError({ error }) {

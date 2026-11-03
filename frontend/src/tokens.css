@@ -1,0 +1,154 @@
+/*
+ * Variables d'estil de l'aplicació. Tota la configuració visual es fa aquí;
+ * styles.css només consumeix les variables de l'apartat 2.
+ *
+ * 1. Tokens de marca: valors oficials extrets de somenergia.coop.
+ * 2. Tokens semàntics: el paper de cada valor dins de l'aplicació.
+ *
+ * Per canviar l'aparença d'un element, reassigna'n el token semàntic.
+ * Per seguir un canvi de marca, actualitza el token oficial.
+ */
+
+:root {
+  /* 1. Tokens de marca ---------------------------------------------------- */
+
+  /* Colors */
+  --som-primary: #0b2e34;
+  --som-primary-70: #0b2e34b3;
+  --som-primary-light: #cdff80;
+  --som-primary-darker: #b6e471;
+  --som-primary-dark: #0c4c27;
+  --som-green-medium: #97d700;
+  --som-background: #f0f3ec;
+  --som-background-two: #e2e8de;
+  --som-background-three: #ced5d0;
+  --som-lila: #afb5e8;
+  --som-orange: #ff632b;
+  --som-orange-light: #ffcdb5;
+  --som-status-alert: #dc3545;
+  --som-white: #ffffff;
+
+  /* Tipografia */
+  --som-font-sans: "Outfit Variable", Outfit, sans-serif;
+  --som-text-h1: 2.875rem;
+  --som-text-h1-mobile: 2.25rem;
+  --som-text-h2: 2.25rem;
+  --som-text-h3: 1.75rem;
+  --som-text-h4: 1.3125rem;
+  --som-text-body-lg: 1.125rem;
+  --som-text-body-md: 1rem;
+  --som-text-body-sm: 0.875rem;
+  --som-text-body-xs: 0.75rem;
+  --som-tracking-h1: -0.1125rem;
+
+  /* Formes */
+  --som-radius-lg: 0.5rem;
+  --som-radius-xl: 0.75rem;
+  --som-radius-2xl: 1rem;
+  --som-radius-full: 999px;
+
+  /* 2. Tokens semàntics --------------------------------------------------- */
+
+  /* Superfícies: com al web, els components blancs van sobre panells de color. */
+  --color-page: var(--som-background);
+  --color-panel: var(--som-background-two);
+  --color-tile: var(--som-white);
+
+  /* Text */
+  --color-text: var(--som-primary);
+  /* El web oficial usa una opacitat del 60%, insuficient per a text petit (AA). */
+  --color-text-muted: var(--som-primary-70);
+  --color-error: var(--som-status-alert);
+
+  /* Camps de formulari */
+  --color-field: var(--som-white);
+  --color-field-border: var(--som-white);
+  --color-field-border-hover: var(--som-primary);
+
+  /* Camps per revisar després d'extreure una factura */
+  --color-review-border: var(--som-orange);
+  --color-review: var(--som-orange-light);
+  --color-review-text: var(--som-primary);
+
+  /* Línies i focus */
+  --color-divider: var(--som-background-three);
+  --color-focus: var(--som-primary);
+
+  /* Botó principal */
+  --color-button: var(--som-primary-light);
+  --color-button-text: var(--som-primary);
+  --color-button-hover: var(--som-primary-darker);
+
+  /* Botó secundari (contorn) */
+  --color-button-secondary-border: var(--som-primary);
+  --color-button-secondary-text: var(--som-primary);
+  --color-button-secondary-hover: var(--som-primary-light);
+
+  /* Botó terciari i pestanya inactiva */
+  --color-button-tertiary: var(--som-white);
+  --color-button-tertiary-text: var(--som-primary);
+  --color-button-tertiary-hover: var(--som-background-three);
+
+  /* Pestanya activa */
+  --color-tab-active: var(--som-primary);
+  --color-tab-active-text: var(--som-white);
+
+  /* Estats */
+  --color-pill: var(--som-white);
+  --color-pill-text: var(--som-primary);
+  --color-status: var(--som-background-two);
+  --color-status-text: var(--som-primary);
+  --color-status-published: var(--som-primary);
+  --color-status-published-text: var(--som-white);
+  --color-status-historical: var(--som-lila);
+  --color-status-historical-text: var(--som-primary);
+
+  /* Tipografia */
+  --font-family: var(--som-font-sans);
+  --font-family-mono: "JetBrains Mono", "Fira Code", monospace;
+  --font-size-title: var(--som-text-h1);
+  --font-size-title-mobile: var(--som-text-h1-mobile);
+  --font-size-heading: var(--som-text-h3);
+  --font-size-section: var(--som-text-h4);
+  --font-size-subsection: var(--som-text-body-lg);
+  --font-size-body: var(--som-text-body-md);
+  --font-size-small: var(--som-text-body-sm);
+  --font-size-button: var(--som-text-body-sm);
+  --font-size-tab: var(--som-text-body-md);
+  --font-size-eyebrow: var(--som-text-body-xs);
+  --font-size-figure: var(--som-text-h4);
+  --font-weight-title: 400;
+  --font-weight-section: 700;
+  --font-weight-label: 400;
+  --font-weight-button: 400;
+  --font-weight-message: 600;
+  --font-weight-strong: 700;
+  --letter-spacing-title: var(--som-tracking-h1);
+  --line-height-title: 1.05;
+  --line-height-body: 1.5;
+
+  /* Formes */
+  --radius-card: var(--som-radius-xl);
+  --radius-tile: var(--som-radius-lg);
+  --radius-control: var(--som-radius-full);
+  --radius-textarea: var(--som-radius-2xl);
+  --radius-pill: var(--som-radius-full);
+  --border-card: 0;
+  --shadow-card: none;
+
+  /* Espais i mides */
+  --layout-max-width: 1440px;
+  --space-page: 2rem 1.25rem 3rem;
+  --space-card: 1.5rem;
+  --space-tile: 1rem;
+  --space-gap: 1rem;
+  --space-control: 0.625rem 1rem;
+  --space-button: 0 1.125rem;
+  --button-height: 2.5rem;
+  --logo-height: 2.5rem;
+
+  /* Moviment */
+  --transition-field: 300ms ease-in-out;
+  --transition-button: 500ms ease-in-out;
+  --transition-tab: 200ms ease-in-out;
+}

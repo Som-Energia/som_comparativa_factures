@@ -10,6 +10,22 @@ MVP per generar una comparativa de factura amb Som Energia a partir d'un formula
 - `backend/config/pdf_templates/comparison/published.json`: punter de la versio activa del template.
 - `backend/config/pdf_templates/comparison/versions/v1/`: contracte editable de `content.yaml`, `theme.yaml` i `assets.yaml`.
 
+## Estils del frontend
+
+Els estils segueixen la imatge de [somenergia.coop](https://www.somenergia.coop/). Tota la configuració visual és a `frontend/src/tokens.css`, en dos nivells:
+
+- `--som-*`: valors oficials de marca (colors, tipografia i radis). Només canvien si canvia la marca.
+- `--color-*`, `--font-*`, `--radius-*`, `--space-*`...: paper de cada valor a l'aplicació. Són els que consumeix `frontend/src/styles.css`, que no conté colors escrits directament.
+
+Per exemple, per fer que el botó principal sigui lila:
+
+```css
+--color-button: var(--som-lila);
+--color-button-hover: var(--som-background-three);
+```
+
+La tipografia Outfit s'empaqueta amb l'aplicació (`@fontsource-variable/outfit`) i el logo i el favicon són a `frontend/public/`. Els PDF tenen el seu propi tema a `backend/config/pdf_templates/`.
+
 ## Contracte minim d'entrada de comparativa
 
 ```json
