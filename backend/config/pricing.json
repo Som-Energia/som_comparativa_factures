@@ -1,20 +1,21 @@
 {
-  "tariff_name": "2.0TD Periodes",
-  "effective_date": "2026-05-01",
+  "tariff_name": "2.0TD_SOM 2026-10-01",
+  "effective_date": "2026-10-01",
   "currency": "EUR",
   "energy_prices_eur_per_kwh": {
-    "P1": 0.226,
-    "P2": 0.15,
-    "P3": 0.124
+    "P1": 0.249,
+    "P2": 0.169,
+    "P3": 0.15
   },
   "contracted_power_prices_eur_per_kw_day": {
-    "P1": 0.0820109589041096,
-    "P2": 0.0080958904109589
+    "P1": 0.082011,
+    "P2": 0.008096
   },
   "self_consumption_surplus_price_eur_per_kwh": 0.03,
   "adjustment_service_eur_per_kwh": 0.019,
   "social_bonus_eur_per_day": 0.024688,
   "meter_rental_eur": 0.81,
   "electric_tax_rate": 0.0511269632,
-  "vat_rate": 0.21
+  "vat_rate": 0.21,
+  "synced_at": "2026-10-22T09:55:57.876397+00:00"
 }
