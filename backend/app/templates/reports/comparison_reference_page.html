@@ -48,6 +48,10 @@
       .notice { color: #171717; font-size: 14.65px; line-height: 1.45; margin-top: 26px; }
       .footer { bottom: 10mm; color: #173f42; font-size: 13.33px; left: 21mm; position: absolute; right: 21mm; }
       .footer .number { float: right; font-size: 20px; }
+      {% if audience == 'business' %}
+      h1, h2 { color: #075340; font-weight: 400; }
+      .footer { text-align: right; }
+      {% endif %}
     </style>
   </head>
   <body>
@@ -101,7 +105,7 @@
         <p><span><strong>{{ copy.flux_solar.format(link='<a href="' ~ copy.flux_solar_url ~ '">' ~ copy.flux_solar_link ~ '</a>')|safe }}</strong></span><span class="amount">{{ euro(report.breakdown.flux_solar_eur) }}</span></p>
       </div>
       <p class="notice">{{ copy.notice }}</p>
-      <footer class="footer">{{ copy.footer }} <span class="number">3</span></footer>
+      <footer class="footer">{{ copy.footer }}{% if audience != 'business' %} <span class="number">3</span>{% endif %}</footer>
     </main>
   </body>
 </html>

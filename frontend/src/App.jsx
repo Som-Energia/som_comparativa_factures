@@ -9,6 +9,7 @@ const initialForm = {
   billing_days: '',
   competitor_invoice_amount: '',
   locale: 'ca',
+  audience: 'individual',
   template_version: '',
   energy_by_periods: {
     P1: '',
@@ -166,7 +167,7 @@ function CompareScreen() {
         if (!payload || Array.isArray(payload)) {
           throw new Error('El JSON ha de contenir un objecte de comparativa.')
         }
-        return payload
+        return { ...payload, locale: form.locale, audience: form.audience }
       } catch (error) {
         if (error instanceof SyntaxError) {
           throw new Error('El JSON no és vàlid.')
@@ -181,6 +182,7 @@ function CompareScreen() {
       billing_days: numberOrEmpty(form.billing_days),
       competitor_invoice_amount: numberOrEmpty(form.competitor_invoice_amount),
       locale: form.locale,
+      audience: form.audience,
       energy_by_periods: {
         P1: numberOrEmpty(form.energy_by_periods.P1),
         P2: numberOrEmpty(form.energy_by_periods.P2),
@@ -405,32 +407,6 @@ function CompareScreen() {
           )}
         </section>
         <section className="form-section">
-          <h2>Document</h2>
-          <div className="two-column-grid">
-            <label>
-              Idioma del PDF
-              <select value={form.locale} onChange={(event) => updateField('locale', event.target.value)}>
-                <option value="ca">Català</option>
-                <option value="es">Castellà</option>
-              </select>
-              <small className="field-help">Només afecta el PDF que es generarà.</small>
-              <FieldError error={errors.locale} />
-            </label>
-            <label>
-              Versio de plantilla (opcional)
-              <input
-                value={form.template_version}
-                onChange={(event) => updateField('template_version', event.target.value)}
-                placeholder="Versió publicada"
-              />
-              <small className="field-help">
-                Es carrega la versió publicada i la podeu canviar si cal.
-              </small>
-              <FieldError error={errors.template_version} />
-            </label>
-          </div>
-        </section>
-        <section className="form-section">
           <h2>Titular i contracte</h2>
           <div className="two-column-grid">
             <label>
@@ -618,6 +594,42 @@ function CompareScreen() {
             </label>
           </section>
         )}
+
+        <section className="form-section">
+          <h2>Opcions del PDF</h2>
+          <p className="section-copy">Trieu el destinatari, l’idioma i la versió de plantilla del document abans de descarregar-lo.</p>
+          <div className="three-column-grid">
+            <label>
+              Tipus de PDF
+              <select value={form.audience} onChange={(event) => updateField('audience', event.target.value)}>
+                <option value="individual">Persona física</option>
+                <option value="business">Empresa o entitat</option>
+              </select>
+              <FieldError error={errors.audience} />
+            </label>
+            <label>
+              Idioma del PDF
+              <select value={form.locale} onChange={(event) => updateField('locale', event.target.value)}>
+                <option value="ca">Català</option>
+                <option value="es">Castellà</option>
+              </select>
+              <FieldError error={errors.locale} />
+            </label>
+            <label>
+              Versió de plantilla (opcional)
+              <input
+                value={form.template_version}
+                onChange={(event) => updateField('template_version', event.target.value)}
+                placeholder="Versió publicada"
+              />
+              <small className="field-help">
+                Es carrega la versió publicada i la podeu canviar si cal.
+              </small>
+              <FieldError error={errors.template_version} />
+            </label>
+          </div>
+          <small className="field-help">Aquestes opcions afecten el document, no els imports de la comparativa.</small>
+        </section>
 
         <div className="actions">
           <button type="submit" disabled={loadingPreview}>

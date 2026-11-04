@@ -27,6 +27,8 @@ RUN mkdir -p /seed-reference/reference
 COPY ["assets/CA_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf", "/seed-reference/reference/comparison-v3.pdf"]
 COPY ["assets/CA_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf", "/seed-reference/reference/comparison-v3-ca.pdf"]
 COPY ["assets/ES_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf", "/seed-reference/reference/comparison-v3-es.pdf"]
+COPY ["assets/EiE_20_CA_PLANTILLA_Comparativa_Factura_Som_Energia.pdf", "/seed-reference/reference/comparison-v3-business-ca.pdf"]
+COPY ["assets/EiE_20_ES_PLANTILLA_Comparativa_Factura_Som_Energia.pdf", "/seed-reference/reference/comparison-v3-business-es.pdf"]
 COPY ["assets/CA_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.docx", "/tmp/comparison-v3.docx"]
 RUN unzip -j /tmp/comparison-v3.docx \
         word/fonts/Outfit-regular.ttf \
