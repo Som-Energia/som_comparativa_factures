@@ -116,6 +116,9 @@ def comparison_report_pdf():
     locale = _extract_locale(payload)
     if isinstance(locale, Response):
         return locale
+    audience = _extract_audience(payload)
+    if isinstance(audience, Response):
+        return audience
 
     try:
         report = build_comparison_report(payload)
@@ -123,7 +126,7 @@ def comparison_report_pdf():
         return jsonify({"errors": exc.errors}), 400
 
     try:
-        pdf_bytes = render_report_pdf(report, template_version=template_version, locale=locale)
+        pdf_bytes = render_report_pdf(report, template_version=template_version, locale=locale, audience=audience)
     except TemplateValidationError as exc:
         return jsonify({"errors": {"template_version": str(exc)}}), 422
     except TemplateResolutionError as exc:
@@ -146,11 +149,14 @@ def comparison_report_preview():
     locale = _extract_locale(request.args)
     if isinstance(locale, Response):
         return locale
+    audience = _extract_audience(request.args)
+    if isinstance(audience, Response):
+        return audience
 
     report = build_comparison_report(SAMPLE_PREVIEW_PAYLOAD)
 
     try:
-        html = render_report_html(report, template_version=template_version, locale=locale)
+        html = render_report_html(report, template_version=template_version, locale=locale, audience=audience)
     except TemplateValidationError as exc:
         return jsonify({"errors": {"template_version": str(exc)}}), 422
     except TemplateResolutionError as exc:
@@ -168,6 +174,9 @@ def comparison_report_preview_from_payload():
     locale = _extract_locale(payload)
     if isinstance(locale, Response):
         return locale
+    audience = _extract_audience(payload)
+    if isinstance(audience, Response):
+        return audience
 
     try:
         report = build_comparison_report(payload)
@@ -175,7 +184,7 @@ def comparison_report_preview_from_payload():
         return jsonify({"errors": exc.errors}), 400
 
     try:
-        html = render_report_html(report, template_version=template_version, locale=locale)
+        html = render_report_html(report, template_version=template_version, locale=locale, audience=audience)
     except TemplateValidationError as exc:
         return jsonify({"errors": {"template_version": str(exc)}}), 422
     except TemplateResolutionError as exc:
@@ -302,6 +311,15 @@ def _extract_template_version(source) -> str | None | Response:
         return response
 
     return template_version
+
+
+def _extract_audience(source) -> str | Response:
+    audience = source.get("audience", "individual")
+    if not isinstance(audience, str) or audience not in {"individual", "business"}:
+        response = jsonify({"errors": {"audience": "El tipus de PDF ha de ser 'individual' o 'business'."}})
+        response.status_code = 400
+        return response
+    return audience
 
 
 def _extract_locale(source) -> str | Response:

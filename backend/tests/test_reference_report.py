@@ -75,8 +75,8 @@ def test_reference_page_resolves_outfit_fonts_from_assets_root(monkeypatch):
     reference_pdf.tobytes.return_value = b"reference"
     monkeypatch.setattr(reporting, "ASSETS_DIR", Path("/app/assets"))
     monkeypatch.setattr(reporting, "HTML", html)
-    monkeypatch.setattr(reporting, "_reference_pdf_path", lambda locale: Path("reference.pdf"))
-    monkeypatch.setattr(reporting, "_render_reference_simulation_html", lambda report, bundle, locale: "<html></html>")
+    monkeypatch.setattr(reporting, "_reference_pdf_path", lambda locale, audience: Path("reference.pdf"))
+    monkeypatch.setattr(reporting, "_render_reference_simulation_html", lambda report, bundle, locale, audience: "<html></html>")
     monkeypatch.setattr(reporting.fitz, "open", Mock(side_effect=[reference_pdf, Mock()]))
 
     reporting._render_reference_report_pdf({}, None, "ca")
@@ -104,3 +104,49 @@ def test_reference_template_pdf_renders_spanish_calculation_page():
         "https://es.support.somenergia.coop/article/1398-que-son-los-excedentes-no-compensados",
         "https://es.support.somenergia.coop/article/1372-que-es-el-flux-solar",
     }
+
+
+@pytest.mark.parametrize("locale", ["ca", "es"])
+@pytest.mark.parametrize("audience", ["individual", "business"])
+def test_pdf_audience_preserves_master_pages_and_calculated_amounts(locale, audience):
+    client = create_app().test_client()
+    payload = _payload() | {"locale": locale, "audience": audience}
+    response = client.post("/api/reports/comparison.pdf", json=payload)
+
+    assert response.status_code == 200
+    with fitz.open(stream=response.data, filetype="pdf") as document, fitz.open(
+        reporting._reference_pdf_path(locale, audience)
+    ) as master:
+        assert document.page_count == master.page_count == 5
+        for index in (0, 1, 3, 4):
+            assert document[index].get_text() == master[index].get_text()
+            assert document[index].get_pixmap().samples == master[index].get_pixmap().samples
+            assert [link.get("uri") for link in document[index].get_links()] == [
+                link.get("uri") for link in master[index].get_links()
+            ]
+        text = document[2].get_text()
+        assert payload["titular"] in text
+        assert payload["cups"] in text
+        assert "28,00 €" in text
+        assert "14,01 €" in text
+        title = (
+            "Resum de la simulació" if locale == "ca" else "Resumen de la simulación"
+        ) if audience == "business" else (
+            "Simulació de cost de la factura" if locale == "ca" else "Simulación del coste de la factura"
+        )
+        assert title in text
+        assert len(document[2].get_links()) == 2
+
+    preview = client.post("/api/reports/comparison.preview", json=payload)
+    assert preview.status_code == 200
+    assert title in preview.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("audience", [None, [], "company", 1])
+@pytest.mark.parametrize("endpoint", ["comparison.pdf", "comparison.preview"])
+def test_report_rejects_invalid_audience(audience, endpoint):
+    response = create_app().test_client().post(
+        f"/api/reports/{endpoint}", json=_payload() | {"audience": audience}
+    )
+    assert response.status_code == 400
+    assert "audience" in response.get_json()["errors"]

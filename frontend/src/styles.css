@@ -225,6 +225,10 @@ textarea {
   gap: 16px;
 }
 
+.section-copy + .three-column-grid {
+  margin-top: 16px;
+}
+
 .input-mode-switcher {
   display: flex;
   gap: 12px;

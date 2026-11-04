@@ -85,23 +85,23 @@ REFERENCE_COPY = {
 }
 
 
-def render_report_pdf(report: dict, template_version: str | None = None, locale: str = "ca") -> bytes:
+def render_report_pdf(report: dict, template_version: str | None = None, locale: str = "ca", audience: str = "individual") -> bytes:
     template_bundle = resolve_comparison_template_bundle(version=template_version)
-    if template_bundle.version == "v3":
-        return _render_reference_report_pdf(report, template_bundle, locale)
+    if template_bundle.version == "v3" or audience == "business":
+        return _render_reference_report_pdf(report, template_bundle, locale, audience)
 
     html = _render_report_html(report, template_bundle, asset_mode="pdf")
     return HTML(string=html, base_url=template_bundle.assets_dir.as_uri()).write_pdf()
 
 
-def render_report_html(report: dict, template_version: str | None = None, locale: str = "ca") -> str:
+def render_report_html(report: dict, template_version: str | None = None, locale: str = "ca", audience: str = "individual") -> str:
     template_bundle = resolve_comparison_template_bundle(version=template_version)
-    return render_report_html_for_bundle(report, template_bundle, locale=locale)
+    return render_report_html_for_bundle(report, template_bundle, locale=locale, audience=audience)
 
 
-def render_report_html_for_bundle(report: dict, template_bundle, locale: str = "ca") -> str:
-    if template_bundle.version == "v3":
-        return _render_reference_simulation_html(report, template_bundle, locale)
+def render_report_html_for_bundle(report: dict, template_bundle, locale: str = "ca", audience: str = "individual") -> str:
+    if template_bundle.version == "v3" or audience == "business":
+        return _render_reference_simulation_html(report, template_bundle, locale, audience)
 
     return _render_report_html(report, template_bundle, asset_mode="html")
 
@@ -124,9 +124,9 @@ def _render_report_html(report: dict, template_bundle, *, asset_mode: str) -> st
     )
 
 
-def _render_reference_report_pdf(report: dict, template_bundle, locale: str) -> bytes:
-    reference_pdf = _reference_pdf_path(locale)
-    simulation_html = _render_reference_simulation_html(report, template_bundle, locale)
+def _render_reference_report_pdf(report: dict, template_bundle, locale: str, audience: str = "individual") -> bytes:
+    reference_pdf = _reference_pdf_path(locale, audience)
+    simulation_html = _render_reference_simulation_html(report, template_bundle, locale, audience)
     simulation_pdf = HTML(string=simulation_html, base_url=f"{ASSETS_DIR.as_uri()}/").write_pdf()
 
     document = fitz.open(reference_pdf)
@@ -136,20 +136,28 @@ def _render_reference_report_pdf(report: dict, template_bundle, locale: str) -> 
     return document.tobytes(garbage=4, deflate=True)
 
 
-def _render_reference_simulation_html(report: dict, template_bundle, locale: str) -> str:
+def _render_reference_simulation_html(report: dict, template_bundle, locale: str, audience: str = "individual") -> str:
     copy = _reference_copy(locale)
+    if audience == "business":
+        copy = copy | {
+            "summary_title": "Resum de la simulació" if locale == "ca" else "Resumen de la simulación",
+            "detail_title": "Detall de la simulació" if locale == "ca" else "Detalle de la simulación",
+            "footer": "www.somenergia.coop",
+        }
     return render_template(
         "reports/comparison_reference_page.html",
         report=report,
         euro=euro,
         locale=locale,
         copy=copy,
+        audience=audience,
         effective_date=_format_effective_date(report["pricing"]["effective_date"], copy),
     )
 
 
-def _reference_pdf_path(locale: str) -> Path:
-    deployed_path = ASSETS_DIR / "reference" / f"comparison-v3-{locale}.pdf"
+def _reference_pdf_path(locale: str, audience: str = "individual") -> Path:
+    suffix = "-business" if audience == "business" else ""
+    deployed_path = ASSETS_DIR / "reference" / f"comparison-v3{suffix}-{locale}.pdf"
     if deployed_path.is_file():
         return deployed_path
 
@@ -158,7 +166,13 @@ def _reference_pdf_path(locale: str) -> Path:
         "ca": "CA_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf",
         "es": "ES_PLANTILLA_Domèstic_Simulació_Factura_Som Energia.pdf",
     }
-    checkout_path = Path(__file__).resolve().parents[3] / "assets" / filenames[locale]
+    checkout_root = Path(__file__).resolve().parents[3]
+    if audience == "business":
+        filenames = {
+            "ca": "EiE_20_CA_PLANTILLA_Comparativa_Factura_Som_Energia.pdf",
+            "es": "EiE_20_ES_PLANTILLA_Comparativa_Factura_Som_Energia.pdf",
+        }
+    checkout_path = checkout_root / "assets" / filenames[locale]
     if checkout_path.is_file():
         return checkout_path
 
