@@ -69,10 +69,7 @@ class ERPPriceClient:
         self._objects = ServerProxy(f"{base_url}/object", allow_none=True)
 
     def fetch_tariff_prices(self, target_date: date) -> dict[str, Any]:
-        uid = self._common.login(self.settings.database, self.settings.user, self.settings.password)
-        if not isinstance(uid, int) or isinstance(uid, bool) or uid <= 0:
-            raise ERPPriceError("L'autenticacio amb l'ERP ha fallat.")
-
+        uid = self._login()
         tariff_ids = self._execute(uid, "search", [("name", "=", TARIFF_NAME)])
         if not isinstance(tariff_ids, list) or len(tariff_ids) != 1:
             raise ERPPriceError("L'ERP ha de retornar exactament una tarifa 2.0TD.")
@@ -91,6 +88,20 @@ class ERPPriceClient:
         if not isinstance(prices, dict):
             raise ERPPriceError("L'ERP no ha retornat un diccionari de preus.")
         return prices
+
+    def fetch_adjustment_prices(self) -> dict[str, Any]:
+        prices = self._execute(
+            self._login(), "get_last_month_average_prices_www", TARIFF_NAME, "ssaa"
+        )
+        if not isinstance(prices, dict) or "error" in prices or "error_code" in prices:
+            raise ERPPriceError("No s'han pogut obtenir els preus dels serveis d'ajust de l'ERP.")
+        return prices
+
+    def _login(self) -> int:
+        uid = self._common.login(self.settings.database, self.settings.user, self.settings.password)
+        if not isinstance(uid, int) or isinstance(uid, bool) or uid <= 0:
+            raise ERPPriceError("L'autenticacio amb l'ERP ha fallat.")
+        return uid
 
     def _execute(self, uid: int, method: str, *args: Any) -> Any:
         return self._objects.execute(
@@ -122,6 +133,20 @@ def _map_periods(prices: dict[str, Any], key: str, periods: tuple[str, ...]) -> 
     if not isinstance(payload, dict):
         raise ERPPriceError(f"L'ERP no ha retornat el terme '{key}'.")
     return {period: _require_price(payload, period) for period in periods}
+
+
+def map_erp_adjustment_prices(prices: dict[str, Any]) -> dict[str, Any]:
+    if prices.get("tariff") != TARIFF_NAME or prices.get("type") != "ssaa":
+        raise ERPPriceError("L'ERP no ha retornat els serveis d'ajust de la tarifa 2.0TD.")
+    price_date = _require_date(prices, "date")
+    mapped = _map_periods(prices, "prices", ("P1", "P2", "P3"))
+    for period in mapped:
+        if prices["prices"][period].get("uom") != "€/kWh":
+            raise ERPPriceError(f"La unitat dels serveis d'ajust '{period}' ha de ser €/kWh.")
+    return {
+        "adjustment_service_prices_eur_per_kwh": mapped,
+        "adjustment_service_price_date": price_date,
+    }
 
 
 def _optional_period_price(prices: dict[str, Any], key: str, period: str) -> float:

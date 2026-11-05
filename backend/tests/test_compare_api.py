@@ -25,7 +25,6 @@ def build_payload(**overrides):
             "P2": 2.3,
         },
         "self_consumption_surplus_kwh": 0,
-        "adjustment_service_eur_per_kwh": 0,
         "meter_rental_eur": 0.81,
         "vat_rate_percent": 21,
         "electric_tax_rate_percent": 5.11,
@@ -60,14 +59,13 @@ def test_compare_returns_report_summary_for_valid_payload():
     }
 
 
-def test_comparison_input_defaults_returns_adjustment_service_price():
+def test_comparison_input_defaults_only_returns_editable_values():
     client = create_app().test_client()
 
     response = client.get("/api/comparison-input-defaults")
 
     assert response.status_code == 200
     assert response.get_json() == {
-        "adjustment_service_eur_per_kwh": 0.019,
         "electric_tax_rate_percent": 5.11269632,
     }
 
@@ -88,7 +86,8 @@ def test_pricing_returns_the_configuration_used_for_calculations():
             "P2": 0.0080958904109589,
         },
         "self_consumption_surplus_price_eur_per_kwh": 0.03,
-        "adjustment_service_eur_per_kwh": 0.019,
+        "adjustment_service_prices_eur_per_kwh": {"P1": 0, "P2": 0, "P3": 0},
+        "adjustment_service_price_date": "2026-04-01",
         "social_bonus_eur_per_day": 0.024688,
         "meter_rental_eur": 0.81,
         "electric_tax_rate": 0.0511269632,
@@ -161,7 +160,7 @@ def test_compare_does_not_compensate_power_when_there_is_no_energy_cost():
     assert body["breakdown"]["flux_solar_eur"] == 0.05
 
 
-def test_compare_includes_adjustment_service_in_electric_tax_base():
+def test_compare_includes_adjustment_service_in_electric_tax_base(reference_pricing, monkeypatch):
     app = create_app()
     client = app.test_client()
 
@@ -176,13 +175,14 @@ def test_compare_includes_adjustment_service_in_electric_tax_base():
             electric_tax_rate_percent=5,
         ),
     )
+    reference_pricing["adjustment_service_prices_eur_per_kwh"] = {"P1": 0.01, "P2": 0, "P3": 0}
+    monkeypatch.setattr("app.services.calculator.load_pricing_config", lambda: reference_pricing)
     response = client.post(
         "/api/compare",
         json=build_payload(
             billing_days=1,
             energy_by_periods={"P1": 100, "P2": 0, "P3": 0},
             contracted_power_kw_by_periods={"P1": 0, "P2": 0},
-            adjustment_service_eur_per_kwh=0.01,
             meter_rental_eur=0,
             vat_rate_percent=21,
             electric_tax_rate_percent=5,
@@ -193,7 +193,7 @@ def test_compare_includes_adjustment_service_in_electric_tax_base():
     assert response.status_code == 200
     base = base_response.get_json()
     body = response.get_json()
-    assert body["input"]["adjustment_service_eur_per_kwh"] == 0.01
+    assert "adjustment_service_eur_per_kwh" not in body["input"]
     assert body["breakdown"]["costs"]["adjustment_services_eur"] == 1.0
     assert round(body["breakdown"]["costs"]["electric_tax_eur"] - base["breakdown"]["costs"]["electric_tax_eur"], 2) == 0.05
     assert round(body["breakdown"]["costs"]["vat_eur"] - base["breakdown"]["costs"]["vat_eur"], 2) == 0.22
@@ -221,6 +221,35 @@ def test_compare_includes_social_bonus_but_not_meter_rental_in_electric_tax_base
     assert body["breakdown"]["costs"]["electric_tax_eur"] == 0.04
     assert body["breakdown"]["costs"]["vat_eur"] == 2.26
     assert body["comparison"]["som_total"] == 13.04
+
+
+def test_compare_uses_server_adjustment_prices_by_period(reference_pricing, monkeypatch):
+    prices = {"P1": 0.012345, "P2": 0, "P3": 0.034567}
+    reference_pricing["adjustment_service_prices_eur_per_kwh"] = prices
+    monkeypatch.setattr("app.services.calculator.load_pricing_config", lambda: reference_pricing)
+    client = create_app().test_client()
+    payload = build_payload(energy_by_periods={"P1": 10, "P2": 50, "P3": 20})
+
+    response = client.post("/api/compare", json=payload)
+    assert response.status_code == 200
+    report = response.get_json()
+    assert report["breakdown"]["costs"]["adjustment_services_eur"] == 0.81
+    assert report["pricing"]["adjustment_service_prices_eur_per_kwh"] == prices
+    assert report["pricing"]["adjustment_service_price_date"] == "2026-04-01"
+    assert report["pricing"]["adjustment_service_weighted_price_eur_per_kwh"] == pytest.approx(0.010184875)
+    assert "adjustment_service_eur_per_kwh" not in report["input"]
+
+    payload["adjustment_service_eur_per_kwh"] = 999
+    payload["adjustment_service_prices_eur_per_kwh"] = {"P1": 999, "P2": 999, "P3": 999}
+    assert client.post("/api/compare", json=payload).get_json() == report
+
+
+def test_compare_adjustment_weighted_price_is_zero_without_consumption():
+    response = create_app().test_client().post(
+        "/api/compare", json=build_payload(energy_by_periods={"P1": 0, "P2": 0, "P3": 0}),
+    )
+    assert response.status_code == 200
+    assert response.get_json()["pricing"]["adjustment_service_weighted_price_eur_per_kwh"] == 0
 
 
 def test_compare_subtracts_surplus_compensation_from_electric_tax_base():
@@ -351,6 +380,7 @@ def test_compare_limits_compensation_to_energy_cost(
         "effective_date": "2026-01-01",
         "currency": "EUR",
         "energy_prices_eur_per_kwh": {"P1": 0.03},
+        "adjustment_service_prices_eur_per_kwh": {"P1": 0.01, "P2": 0, "P3": 0},
         "contracted_power_prices_eur_per_kw_day": {"P1": 0.1},
         "social_bonus_eur_per_day": 0.02,
         "self_consumption_surplus_price_eur_per_kwh": 0.03,
@@ -364,7 +394,6 @@ def test_compare_limits_compensation_to_energy_cost(
                 billing_days=30,
                 energy_by_periods={"P1": 100, "P2": 0, "P3": 0},
                 contracted_power_kw_by_periods={"P1": 1 / 3, "P2": 0},
-                adjustment_service_eur_per_kwh=0.01,
                 self_consumption_surplus_kwh=surplus_kwh,
                 meter_rental_eur=0.81,
                 electric_tax_rate_percent=5,
@@ -405,6 +434,7 @@ def test_compare_surplus_kwh_are_not_derived_from_rounded_compensation(
         "effective_date": "2026-01-01",
         "currency": "EUR",
         "energy_prices_eur_per_kwh": {"P1": energy_cost},
+        "adjustment_service_prices_eur_per_kwh": {"P1": 0, "P2": 0, "P3": 0},
         "contracted_power_prices_eur_per_kw_day": {},
         "social_bonus_eur_per_day": 0,
         "self_consumption_surplus_price_eur_per_kwh": 0.03,
@@ -438,7 +468,6 @@ def test_compare_rejects_negative_billing_values_and_invalid_percentages():
         json=build_payload(
             contracted_power_kw_by_periods={"P1": -1, "P2": 1},
             self_consumption_surplus_kwh=-1,
-            adjustment_service_eur_per_kwh=-1,
             meter_rental_eur=-1,
             vat_rate_percent=101,
             electric_tax_rate_percent=-1,
@@ -448,7 +477,6 @@ def test_compare_rejects_negative_billing_values_and_invalid_percentages():
     assert response.status_code == 400
     assert response.get_json()["errors"] == {
         "contracted_power_kw_by_periods.P1": "La potència contractada del període P1 ha de ser positiva o zero.",
-        "adjustment_service_eur_per_kwh": "El servei d'ajust per kWh ha de ser positiu o zero.",
         "electric_tax_rate_percent": "El tipus d'impost elèctric ha de ser entre 0 i 100.",
         "meter_rental_eur": "El lloguer del comptador ha de ser positiu o zero.",
         "self_consumption_surplus_kwh": "Els excedents d'autoconsum han de ser positius o zero.",

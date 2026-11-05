@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import mimetypes
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -33,6 +34,7 @@ REFERENCE_COPY = {
         "energy_cost": "Cost per l'energia utilitzada",
         "surplus_compensation": "Compensació d'excedents",
         "adjustment_cost": "Cost Serveis d'Ajust",
+        "adjustment_notice": "El preu del servei d'ajust {price} € està fixat per Red Eléctrica Española (REE) i és el valor mitjà de l'últim mes.",
         "social_bonus": "Bo Social",
         "electric_tax": "Impost elèctric",
         "meter_rental_cost": "Cost del lloguer del comptador",
@@ -68,6 +70,7 @@ REFERENCE_COPY = {
         "energy_cost": "Coste por la energía utilizada",
         "surplus_compensation": "Compensación de excedentes",
         "adjustment_cost": "Coste Servicios de Ajuste",
+        "adjustment_notice": "El precio del servicio de ajuste {price} € está fijado por Red Eléctrica Española (REE) y es el valor medio del último mes.",
         "social_bonus": "Bono Social",
         "electric_tax": "Impuesto eléctrico",
         "meter_rental_cost": "Coste del alquiler del contador",
@@ -90,7 +93,7 @@ def render_report_pdf(report: dict, template_version: str | None = None, locale:
     if template_bundle.version == "v3" or audience == "business":
         return _render_reference_report_pdf(report, template_bundle, locale, audience)
 
-    html = _render_report_html(report, template_bundle, asset_mode="pdf")
+    html = _render_report_html(report, template_bundle, asset_mode="pdf", locale=locale)
     return HTML(string=html, base_url=template_bundle.assets_dir.as_uri()).write_pdf()
 
 
@@ -103,14 +106,21 @@ def render_report_html_for_bundle(report: dict, template_bundle, locale: str = "
     if template_bundle.version == "v3" or audience == "business":
         return _render_reference_simulation_html(report, template_bundle, locale, audience)
 
-    return _render_report_html(report, template_bundle, asset_mode="html")
+    return _render_report_html(report, template_bundle, asset_mode="html", locale=locale)
 
 
 def euro(amount: float) -> str:
     return f"{amount:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def _render_report_html(report: dict, template_bundle, *, asset_mode: str) -> str:
+def _adjustment_notice(report: dict, locale: str) -> str:
+    price = Decimal(str(report["pricing"]["adjustment_service_weighted_price_eur_per_kwh"]))
+    formatted_price = format(price.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP), "f")
+    formatted_price = formatted_price.rstrip("0").rstrip(".").replace(".", ",")
+    return _reference_copy(locale)["adjustment_notice"].format(price=formatted_price)
+
+
+def _render_report_html(report: dict, template_bundle, *, asset_mode: str, locale: str = "ca") -> str:
     content = _resolve_template_content(template_bundle.content, report)
     assets = _resolve_render_assets(template_bundle.assets, mode=asset_mode)
     return render_template(
@@ -121,6 +131,8 @@ def _render_report_html(report: dict, template_bundle, *, asset_mode: str) -> st
         theme=template_bundle.theme,
         euro=euro,
         template_bundle=template_bundle,
+        locale=locale,
+        adjustment_notice=_adjustment_notice(report, locale),
     )
 
 
@@ -152,6 +164,7 @@ def _render_reference_simulation_html(report: dict, template_bundle, locale: str
         copy=copy,
         audience=audience,
         effective_date=_format_effective_date(report["pricing"]["effective_date"], copy),
+        adjustment_notice=_adjustment_notice(report, locale),
     )
 
 
