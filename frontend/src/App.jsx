@@ -9,6 +9,7 @@ const initialForm = {
   billing_days: '',
   competitor_invoice_amount: '',
   locale: 'ca',
+  audience: 'individual',
   template_version: '',
   energy_by_periods: {
     P1: '',
@@ -20,7 +21,6 @@ const initialForm = {
     P2: '',
   },
   self_consumption_surplus_kwh: '',
-  adjustment_service_eur_per_kwh: '',
   meter_rental_eur: '',
   vat_rate_percent: '21',
   electric_tax_rate_percent: '',
@@ -112,9 +112,6 @@ function CompareScreen() {
       const defaults = await response.json()
       setForm((current) => ({
         ...current,
-        adjustment_service_eur_per_kwh: current.adjustment_service_eur_per_kwh === ''
-          ? String(defaults.adjustment_service_eur_per_kwh)
-          : current.adjustment_service_eur_per_kwh,
         electric_tax_rate_percent: current.electric_tax_rate_percent === ''
           ? String(defaults.electric_tax_rate_percent)
           : current.electric_tax_rate_percent,
@@ -198,7 +195,7 @@ function CompareScreen() {
         if (!payload || Array.isArray(payload)) {
           throw new Error('El JSON ha de contenir un objecte de comparativa.')
         }
-        return payload
+        return { ...payload, locale: form.locale, audience: form.audience }
       } catch (error) {
         if (error instanceof SyntaxError) {
           throw new Error('El JSON no és vàlid.')
@@ -213,6 +210,7 @@ function CompareScreen() {
       billing_days: numberOrEmpty(form.billing_days),
       competitor_invoice_amount: numberOrEmpty(form.competitor_invoice_amount),
       locale: form.locale,
+      audience: form.audience,
       energy_by_periods: {
         P1: numberOrEmpty(form.energy_by_periods.P1),
         P2: numberOrEmpty(form.energy_by_periods.P2),
@@ -223,7 +221,6 @@ function CompareScreen() {
         P2: numberOrEmpty(form.contracted_power_kw_by_periods.P2),
       },
       self_consumption_surplus_kwh: numberOrEmpty(form.self_consumption_surplus_kwh),
-      adjustment_service_eur_per_kwh: numberOrEmpty(form.adjustment_service_eur_per_kwh),
       meter_rental_eur: numberOrEmpty(form.meter_rental_eur),
       vat_rate_percent: numberOrEmpty(form.vat_rate_percent),
       electric_tax_rate_percent: numberOrEmpty(form.electric_tax_rate_percent),
@@ -792,6 +789,12 @@ function PricingScreen() {
 
           <PricingSection title="Energia" unit="EUR/kWh" prices={pricing.energy_prices_eur_per_kwh} />
           <PricingSection title="Potència contractada" unit="EUR/kW/dia" prices={pricing.contracted_power_prices_eur_per_kw_day} />
+          <PricingSection title="Serveis d’ajust" unit="EUR/kWh" prices={pricing.adjustment_service_prices_eur_per_kwh} />
+          <p className="field-help">
+            {pricing.adjustment_service_price_date
+              ? `Data dels preus mitjans de l’ERP: ${pricing.adjustment_service_price_date}`
+              : 'Preus de la configuració anterior, pendents de la primera sincronització amb l’ERP.'}
+          </p>
 
           <section className="pricing-section">
             <h3>Altres conceptes</h3>
