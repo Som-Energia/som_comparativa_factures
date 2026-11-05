@@ -485,7 +485,7 @@ function CompareScreen() {
 
           <section className="form-section">
             <h3>Dades de la factura</h3>
-            <div className="three-column-grid">
+            <div className="two-column-grid">
               <label>
                 Import factura competència
                 <input
@@ -513,6 +513,9 @@ function CompareScreen() {
                 <FieldError error={errors.billing_days} />
                 <FieldIssue issues={extractionIssues} field="billing_days" />
               </label>
+            </div>
+
+            <div className="three-column-grid">
               <label>
                 Lloguer del comptador (EUR)
                 <input
