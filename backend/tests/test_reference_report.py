@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+from html import unescape
 from unittest.mock import Mock
 
 import fitz
@@ -11,6 +13,12 @@ from app.services import reporting
 pytestmark = pytest.mark.usefixtures("reference_pricing")
 
 
+@pytest.fixture(autouse=True)
+def report_adjustment_prices(reference_pricing, tmp_path):
+    reference_pricing["adjustment_service_prices_eur_per_kwh"] = {"P1": 0.02, "P2": 0.02, "P3": 0.02}
+    (tmp_path / "pricing.json").write_text(json.dumps(reference_pricing), encoding="utf-8")
+
+
 def _payload():
     return {
         "cups": "ES0210002100000000ZN0F",
@@ -20,7 +28,6 @@ def _payload():
         "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
         "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3},
         "self_consumption_surplus_kwh": 2000,
-        "adjustment_service_eur_per_kwh": 0.02,
         "meter_rental_eur": 0.81,
         "vat_rate_percent": 21,
         "electric_tax_rate_percent": 5.11,
@@ -150,3 +157,51 @@ def test_report_rejects_invalid_audience(audience, endpoint):
     )
     assert response.status_code == 400
     assert "audience" in response.get_json()["errors"]
+
+
+@pytest.mark.parametrize("version", ["v1", "v2", "v3"])
+@pytest.mark.parametrize("locale", ["ca", "es"])
+@pytest.mark.parametrize("audience", ["individual", "business"])
+def test_all_pdf_variants_include_weighted_adjustment_notice(version, locale, audience, reference_pricing, monkeypatch):
+    reference_pricing["adjustment_service_prices_eur_per_kwh"] = {"P1": 0.012345, "P2": 0, "P3": 0.034567}
+    monkeypatch.setattr("app.services.calculator.load_pricing_config", lambda: reference_pricing)
+    payload = _payload() | {
+        "template_version": version, "locale": locale, "audience": audience,
+        "energy_by_periods": {"P1": 10, "P2": 50, "P3": 20},
+    }
+    expected = (
+        "El preu del servei d'ajust 0,010185 € està fixat per Red Eléctrica Española (REE) "
+        "i és el valor mitjà de l'últim mes."
+    ) if locale == "ca" else (
+        "El precio del servicio de ajuste 0,010185 € está fijado por Red Eléctrica Española (REE) "
+        "y es el valor medio del último mes."
+    )
+    client = create_app().test_client()
+    response = client.post("/api/reports/comparison.pdf", json=payload)
+    assert response.status_code == 200
+    with fitz.open(stream=response.data, filetype="pdf") as document:
+        pages = [page for page in document if "Red Eléctrica Española" in page.get_text()]
+        assert len(pages) == 1
+        page = pages[0]
+        text = " ".join(page.get_text().split())
+        assert expected in text
+        assert text.index("Total") < text.index(expected)
+        if version == "v3" or audience == "business":
+            assert document.page_count == 5
+            footer_text = "www.somenergia.coop" if audience == "business" else (
+                "Simulació factura Som Energia" if locale == "ca" else "Simulación factura Som Energia"
+            )
+            footer_top = min(rect.y0 for rect in page.search_for(footer_text))
+            for block in page.get_text("blocks"):
+                if "Red Eléctrica Española" in block[4] or "solo es válida" in block[4] or "només és vàlida" in block[4]:
+                    assert block[3] < footer_top
+
+    preview = client.post("/api/reports/comparison.preview", json=payload)
+    assert preview.status_code == 200
+    assert expected in unescape(preview.get_data(as_text=True))
+
+
+@pytest.mark.parametrize("price, expected", [(0, "0 €"), (0.025, "0,025 €")])
+def test_adjustment_notice_formats_zero_and_trims_decimal_zeros(price, expected):
+    report = {"pricing": {"adjustment_service_weighted_price_eur_per_kwh": price}}
+    assert expected in reporting._adjustment_notice(report, "ca")

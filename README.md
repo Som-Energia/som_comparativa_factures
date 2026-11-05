@@ -169,6 +169,12 @@ Enganxeu `compose.yml` com a Stack a Portainer, afegiu les variables i desplegue
 
 El servei intern `pricing-sync` consulta diariament a les 00:10, en hora `Europe/Madrid`, la tarifa `2.0TD` de l'ERP per a la data situada 31 dies en el futur. La tarifa futura ja publicada s'aplica immediatament a la comparativa; `effective_date` n'indica la data d'entrada en vigor. Si la consulta falla o retorna dades invalides, es conserva l'ultim `pricing.json` valid.
 
+La mateixa sincronització obté els serveis d'ajust amb `giscedata.polissa.tarifa.get_last_month_average_prices_www("2.0TD", "ssaa")`. Els preus P1, P2 i P3 es desen a `adjustment_service_prices_eur_per_kwh`, en €/kWh sense impostos, i s'apliquen al consum de cada període. El backend arrodoneix la suma a cèntims i inclou l'import a la base de l'impost elèctric. Aquest concepte ja no es demana al formulari; els valors enviats pel client no substitueixen els preus configurats.
+
+`adjustment_service_price_date` conserva la data del registre retornat per l'ERP, independent de `effective_date`. El helper selecciona l'últim registre disponible, que no és necessàriament del mes anterior. La pantalla **Preus** mostra els imports i aquesta data. Si falla qualsevol consulta o validació, no s'actualitza cap dels preus.
+
+En desplegar aquesta versió, l'ERP ha de tenir disponible el helper de la [PR #1522](https://github.com/Som-Energia/openerp_som_addons/pull/1522). El servei sincronitza també en arrencar. Fins a la primera sincronització correcta, el valor antic `adjustment_service_eur_per_kwh` es llegeix com un mateix preu per als tres períodes, sense atribuir-li cap data de l'ERP; la pantalla **Preus** indica que està pendent de sincronitzar. La primera actualització correcta desa el nou format i elimina el camp antic. La configuració inicial inclosa a la imatge també conserva aquests imports previs amb data nul·la.
+
 El servei requereix aquestes variables addicionals, que nomes s'injecten a `pricing-sync`:
 
 | Variable | Exemple | Descripcio |
@@ -180,6 +186,6 @@ El servei requereix aquestes variables addicionals, que nomes s'injecten a `pric
 | `OOOP_PORT` | `443` | Port XML-RPC de l'ERP. |
 | `TARIFF_MUNICIPI_ID` | `28` | Municipi de referencia per als preus peninsulars. Valor per defecte: `28`. |
 
-No deseu les credencials ERP al repositori ni als logs. Aquesta primera fase sincronitza nomes els imports de tarifa que aplica directament el calcul: energia, potencia, compensacio d'excedents i bo social. Els serveis d'ajust, el lloguer de comptador i els impostos continuen venint del formulari o de l'extraccio de factura.
+No deseu les credencials ERP al repositori ni als logs. La sincronització actualitza energia, potència, compensació d'excedents, bo social i serveis d'ajust. El lloguer del comptador i els impostos continuen venint del formulari o de l'extracció de factura.
 
 L'aplicacio no incorpora autenticacio: l'accés ha d'estar restringit per la VPN de l'organitzacio. Qualsevol usuari de la VPN pot gestionar les plantilles publicades.

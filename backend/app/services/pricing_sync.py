@@ -6,7 +6,7 @@ from time import sleep
 from zoneinfo import ZoneInfo
 
 from app.config import update_pricing_config
-from app.services.erp_pricing import ERPPriceClient, ERPSettings, map_erp_prices
+from app.services.erp_pricing import ERPPriceClient, ERPSettings, map_erp_adjustment_prices, map_erp_prices
 
 
 LOGGER = logging.getLogger(__name__)
@@ -21,6 +21,7 @@ def sync_pricing(now: datetime | None = None) -> dict:
     client = ERPPriceClient(ERPSettings.from_environment())
     prices = client.fetch_tariff_prices(target_date)
     updated_fields = map_erp_prices(prices, synced_at=datetime.now(UTC).isoformat())
+    updated_fields.update(map_erp_adjustment_prices(client.fetch_adjustment_prices()))
     return update_pricing_config(updated_fields)
 
 

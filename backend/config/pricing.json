@@ -12,7 +12,12 @@
     "P2": 0.008096
   },
   "self_consumption_surplus_price_eur_per_kwh": 0.03,
-  "adjustment_service_eur_per_kwh": 0.019,
+  "adjustment_service_prices_eur_per_kwh": {
+    "P1": 0.019,
+    "P2": 0.019,
+    "P3": 0.019
+  },
+  "adjustment_service_price_date": null,
   "social_bonus_eur_per_day": 0.024688,
   "meter_rental_eur": 0.81,
   "electric_tax_rate": 0.0511269632,

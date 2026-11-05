@@ -21,7 +21,6 @@ const initialForm = {
     P2: '',
   },
   self_consumption_surplus_kwh: '',
-  adjustment_service_eur_per_kwh: '',
   meter_rental_eur: '',
   vat_rate_percent: '21',
   electric_tax_rate_percent: '',
@@ -88,9 +87,6 @@ function CompareScreen() {
       const defaults = await response.json()
       setForm((current) => ({
         ...current,
-        adjustment_service_eur_per_kwh: current.adjustment_service_eur_per_kwh === ''
-          ? String(defaults.adjustment_service_eur_per_kwh)
-          : current.adjustment_service_eur_per_kwh,
         electric_tax_rate_percent: current.electric_tax_rate_percent === ''
           ? String(defaults.electric_tax_rate_percent)
           : current.electric_tax_rate_percent,
@@ -193,7 +189,6 @@ function CompareScreen() {
         P2: numberOrEmpty(form.contracted_power_kw_by_periods.P2),
       },
       self_consumption_surplus_kwh: numberOrEmpty(form.self_consumption_surplus_kwh),
-      adjustment_service_eur_per_kwh: numberOrEmpty(form.adjustment_service_eur_per_kwh),
       meter_rental_eur: numberOrEmpty(form.meter_rental_eur),
       vat_rate_percent: numberOrEmpty(form.vat_rate_percent),
       electric_tax_rate_percent: numberOrEmpty(form.electric_tax_rate_percent),
@@ -434,7 +429,7 @@ function CompareScreen() {
 
         <section className="form-section">
           <h2>Dades de la factura</h2>
-          <div className="three-column-grid">
+          <div className="two-column-grid">
             <label>
               Import factura competència
               <input
@@ -460,19 +455,8 @@ function CompareScreen() {
               />
               <FieldError error={errors.billing_days} />
             </label>
-            <label>
-              Servei d'ajust (EUR/kWh)
-              <input
-                type="number"
-                name="adjustment_service_eur_per_kwh"
-                autoComplete="on"
-                min="0"
-                step="0.000001"
-                value={form.adjustment_service_eur_per_kwh}
-                onChange={(event) => updateField('adjustment_service_eur_per_kwh', event.target.value)}
-              />
-              <FieldError error={errors.adjustment_service_eur_per_kwh} />
-            </label>
+          </div>
+          <div className="three-column-grid">
             <label>
               Lloguer del comptador (EUR)
               <input
@@ -742,6 +726,12 @@ function PricingScreen() {
 
           <PricingSection title="Energia" unit="EUR/kWh" prices={pricing.energy_prices_eur_per_kwh} />
           <PricingSection title="Potència contractada" unit="EUR/kW/dia" prices={pricing.contracted_power_prices_eur_per_kw_day} />
+          <PricingSection title="Serveis d’ajust" unit="EUR/kWh" prices={pricing.adjustment_service_prices_eur_per_kwh} />
+          <p className="field-help">
+            {pricing.adjustment_service_price_date
+              ? `Data dels preus mitjans de l’ERP: ${pricing.adjustment_service_price_date}`
+              : 'Preus de la configuració anterior, pendents de la primera sincronització amb l’ERP.'}
+          </p>
 
           <section className="pricing-section">
             <h3>Altres conceptes</h3>

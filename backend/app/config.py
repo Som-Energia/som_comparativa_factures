@@ -63,7 +63,16 @@ TEMPLATE_VERSION_PATTERN = re.compile(r"^v([1-9][0-9]*)$")
 
 def load_pricing_config() -> dict:
     with _pricing_path().open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+        pricing = json.load(handle)
+    # Preserve the last configured price until the first successful SSAA sync.
+    if "adjustment_service_prices_eur_per_kwh" not in pricing:
+        legacy_price = pricing["adjustment_service_eur_per_kwh"]
+        pricing["adjustment_service_prices_eur_per_kwh"] = {
+            period: legacy_price for period in ("P1", "P2", "P3")
+        }
+    pricing.setdefault("adjustment_service_price_date", None)
+    pricing.pop("adjustment_service_eur_per_kwh", None)
+    return pricing
 
 
 def update_pricing_config(updated_fields: dict[str, Any]) -> dict:

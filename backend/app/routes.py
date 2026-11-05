@@ -44,7 +44,6 @@ SAMPLE_PREVIEW_PAYLOAD = {
         "P2": 2.3,
     },
     "self_consumption_surplus_kwh": 0,
-    "adjustment_service_eur_per_kwh": 0,
     "meter_rental_eur": 0.81,
     "vat_rate_percent": 21,
     "electric_tax_rate_percent": 5.11269632,
@@ -60,7 +59,6 @@ def healthcheck():
 def comparison_input_defaults():
     pricing = load_pricing_config()
     return {
-        "adjustment_service_eur_per_kwh": pricing["adjustment_service_eur_per_kwh"],
         "electric_tax_rate_percent": float(Decimal(str(pricing["electric_tax_rate"])) * 100),
     }
 
