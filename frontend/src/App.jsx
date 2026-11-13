@@ -20,7 +20,7 @@ const initialForm = {
     P1: '',
     P2: '',
   },
-  self_consumption_surplus_kwh: '',
+  self_consumption_surplus_kwh: 0,
   meter_rental_eur: '',
   vat_rate_percent: '21',
   electric_tax_rate_percent: '',
@@ -302,7 +302,7 @@ function CompareScreen() {
           P1: input.contracted_power_kw_by_periods.P1 ?? '',
           P2: input.contracted_power_kw_by_periods.P2 ?? '',
         },
-        self_consumption_surplus_kwh: input.self_consumption_surplus_kwh ?? '',
+        self_consumption_surplus_kwh: input.self_consumption_surplus_kwh ?? 0,
         meter_rental_eur: input.meter_rental_eur ?? '',
         vat_rate_percent: input.vat_rate_percent ?? '',
         electric_tax_rate_percent: input.electric_tax_rate_percent ?? '',
@@ -615,6 +615,11 @@ function CompareScreen() {
                 step="0.01"
                 value={form.self_consumption_surplus_kwh}
                 onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
+                onBlur={(event) => {
+                  if (event.target.value === '') {
+                    updateField('self_consumption_surplus_kwh', 0)
+                  }
+                }}
               />
               <FieldError error={errors.self_consumption_surplus_kwh} />
               <FieldIssue issues={extractionIssues} field="self_consumption_surplus_kwh" />
