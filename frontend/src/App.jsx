@@ -373,7 +373,7 @@ function CompareScreen() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'comparison-report.pdf'
+    link.download = payload.locale === 'ca' ? 'Simulacio_factura.pdf' : 'Simulacion_factura.pdf'
     link.click()
     URL.revokeObjectURL(url)
   }

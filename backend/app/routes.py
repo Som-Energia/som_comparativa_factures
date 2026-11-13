@@ -130,7 +130,7 @@ def comparison_report_pdf():
     except TemplateResolutionError as exc:
         return jsonify({"errors": {"template_version": str(exc)}}), 404
 
-    filename = f"comparison-report-{report['customer']['cups']}.pdf"
+    filename = "Simulacio_factura.pdf" if locale == "ca" else "Simulacion_factura.pdf"
     return send_file(
         BytesIO(pdf_bytes),
         mimetype="application/pdf",
