@@ -20,7 +20,7 @@ const initialForm = {
     P1: '',
     P2: '',
   },
-  self_consumption_surplus_kwh: '',
+  self_consumption_surplus_kwh: 0,
   meter_rental_eur: '',
   vat_rate_percent: '21',
   electric_tax_rate_percent: '',
@@ -302,7 +302,7 @@ function CompareScreen() {
           P1: input.contracted_power_kw_by_periods.P1 ?? '',
           P2: input.contracted_power_kw_by_periods.P2 ?? '',
         },
-        self_consumption_surplus_kwh: input.self_consumption_surplus_kwh ?? '',
+        self_consumption_surplus_kwh: input.self_consumption_surplus_kwh ?? 0,
         meter_rental_eur: input.meter_rental_eur ?? '',
         vat_rate_percent: input.vat_rate_percent ?? '',
         electric_tax_rate_percent: input.electric_tax_rate_percent ?? '',
@@ -373,7 +373,7 @@ function CompareScreen() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'comparison-report.pdf'
+    link.download = payload.locale === 'ca' ? 'Simulacio_factura.pdf' : 'Simulacion_factura.pdf'
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -615,6 +615,11 @@ function CompareScreen() {
                 step="0.01"
                 value={form.self_consumption_surplus_kwh}
                 onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
+                onBlur={(event) => {
+                  if (event.target.value === '') {
+                    updateField('self_consumption_surplus_kwh', 0)
+                  }
+                }}
               />
               <FieldError error={errors.self_consumption_surplus_kwh} />
               <FieldIssue issues={extractionIssues} field="self_consumption_surplus_kwh" />
@@ -702,7 +707,11 @@ function CompareScreen() {
           <>
             <div className="summary-grid">
               <SummaryItem label="Cost actual" value={formatEuro(preview.comparison.competitor_total)} />
-              <SummaryItem label="Cost Som Energia" value={formatEuro(preview.comparison.som_total)} />
+              <SummaryItem
+                label="Cost Som Energia"
+                value={formatEuro(preview.comparison.som_total)}
+                tone={preview.comparison.savings > 0 ? 'better' : preview.comparison.savings < 0 ? 'higher' : 'equal'}
+              />
               <SummaryItem label={preview.comparison.savings_label} value={formatEuro(preview.comparison.savings)} />
             </div>
 
@@ -1154,9 +1163,9 @@ function StatusMessage({ message }) {
   return <p className="status-message">{message}</p>
 }
 
-function SummaryItem({ label, value }) {
+function SummaryItem({ label, value, tone }) {
   return (
-    <div className="summary-item">
+    <div className={`summary-item${tone ? ` summary-item--${tone}` : ''}`}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
