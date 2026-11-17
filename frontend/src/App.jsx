@@ -707,7 +707,11 @@ function CompareScreen() {
           <>
             <div className="summary-grid">
               <SummaryItem label="Cost actual" value={formatEuro(preview.comparison.competitor_total)} />
-              <SummaryItem label="Cost Som Energia" value={formatEuro(preview.comparison.som_total)} />
+              <SummaryItem
+                label="Cost Som Energia"
+                value={formatEuro(preview.comparison.som_total)}
+                tone={preview.comparison.savings > 0 ? 'better' : preview.comparison.savings < 0 ? 'higher' : 'equal'}
+              />
               <SummaryItem label={preview.comparison.savings_label} value={formatEuro(preview.comparison.savings)} />
             </div>
 
@@ -1159,9 +1163,9 @@ function StatusMessage({ message }) {
   return <p className="status-message">{message}</p>
 }
 
-function SummaryItem({ label, value }) {
+function SummaryItem({ label, value, tone }) {
   return (
-    <div className="summary-item">
+    <div className={`summary-item${tone ? ` summary-item--${tone}` : ''}`}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>

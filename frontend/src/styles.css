@@ -459,6 +459,18 @@ label:has(.field-issue) input {
   background: var(--color-tile);
 }
 
+.summary-item--higher {
+  background: #fee2e2;
+}
+
+.summary-item--better {
+  background: #dcfce7;
+}
+
+.summary-item--equal {
+  background: #fef9c3;
+}
+
 .summary-item span {
   display: block;
   color: var(--color-text-muted);
