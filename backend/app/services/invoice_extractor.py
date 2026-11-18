@@ -57,8 +57,8 @@ SPANISH_MONTHS = {
 }
 CATALAN_BILLING_PERIOD_PATTERN = re.compile(
     r"dels\s+dies\s+"
-    r"(\d{1,2})\s+de\s+([a-zà-ÿ]+)\s+(\d{4})\s*[-–]\s*"
-    r"(\d{1,2})\s+de\s+([a-zà-ÿ]+)\s+(\d{4})",
+    r"(\d{1,2})\s+d(?:e\s+|['’]\s*)([a-zà-ÿ]+)\s+(\d{4})\s*[-–]\s*"
+    r"(\d{1,2})\s+d(?:e\s+|['’]\s*)([a-zà-ÿ]+)\s+(\d{4})",
     re.IGNORECASE,
 )
 SPANISH_BILLING_PERIOD_PATTERN = re.compile(
@@ -161,6 +161,14 @@ def extract_cups(text: str, words: list[tuple[Any, ...]] | None = None) -> str |
                     and CUPS_PATTERN.fullmatch(candidate[5])
                 ):
                     return re.sub(r"\s+", "", candidate[5]).upper()
+            below = " ".join(
+                word[5] for word in sorted(words, key=lambda word: (word[2], word[1]))
+                if word[0] == label[0] and label[4] < word[2] < label[4] + 25
+                and label[1] - 2 <= word[1] < label[1] + 180
+            )
+            match = CUPS_PATTERN.search(below)
+            if match:
+                return re.sub(r"\s+", "", match.group(0)).upper()
 
     labeled = re.search(r"\bCUPS\b.{0,100}?" + CUPS_PATTERN.pattern, text, re.IGNORECASE | re.DOTALL)
     match = CUPS_PATTERN.search(labeled.group(0) if labeled else text)
@@ -168,6 +176,34 @@ def extract_cups(text: str, words: list[tuple[Any, ...]] | None = None) -> str |
 
 
 def extract_titular(text: str, words: list[tuple[Any, ...]] | None = None) -> str | None:
+    # Holaluz's supply-holder block also supports names wrapped over several lines.
+    holder_text = text
+    if words:
+        for label in words:
+            if label[5].casefold() != "titular":
+                continue
+            line = " ".join(
+                word[5] for word in sorted(words, key=lambda word: word[1])
+                if word[0] == label[0] and abs(word[2] - label[2]) < 3
+                and label[1] <= word[1] < label[1] + 180
+            )
+            if not re.match(r"titular del (?:subministrament|suministro)\s*:", line, re.IGNORECASE):
+                continue
+            holder_text = "\n".join(
+                word[5] for word in sorted(words, key=lambda word: (word[2], word[1]))
+                if word[0] == label[0] and label[1] - 2 <= word[1] < label[1] + 180
+                and label[2] <= word[2] < label[2] + 85
+            )
+            break
+    supply_holder = re.search(
+        r"titular\s+del\s+(?:subministrament|suministro)\s*:\s*(.{2,160}?)\s*(?=\bNIF\s*:)",
+        holder_text, re.IGNORECASE | re.DOTALL,
+    )
+    if supply_holder:
+        value = re.sub(r"\s+", " ", supply_holder.group(1)).strip()
+        if is_titular_value(value):
+            return value
+
     if words:
         for label in words:
             if label[5].casefold() != "nombre:":
@@ -496,6 +532,13 @@ def extract_total_amount(text: str, words: list[tuple[Any, ...]] | None = None) 
     if total_to_pay:
         return normalize_number(total_to_pay.group(1))
 
+    holaluz_total = re.search(
+        rf"^\s*total(?:\s+tarifa\s+justa)?\s+{AMOUNT_PATTERN}\s*(?:€|eur\b)",
+        text, re.IGNORECASE | re.MULTILINE,
+    )
+    if holaluz_total:
+        return normalize_number(holaluz_total.group(1))
+
     if words:
         for label in words:
             if label[5].upper().rstrip(":") != "TOTAL":
@@ -534,6 +577,42 @@ def extract_energy_by_periods(
     text: str, words: list[tuple[Any, ...]] | None = None
 ) -> dict[str, float | None]:
     periods: dict[str, float | None] = {"P1": None, "P2": None, "P3": None}
+    # Holaluz Tarifa Justa puts consumption in the extra-information summary.
+    summary = re.search(
+        r"resumen\s+de\s+tu\s+consumo\s+estimado\b(?P<details>.{0,500})",
+        text, re.IGNORECASE | re.DOTALL,
+    )
+    if summary:
+        for label, value in re.findall(
+            rf"consumo\s+en\s+(punta|llano|valle)\s*:\s*({NUMBER_PATTERN})\s*kwh",
+            summary.group("details"), re.IGNORECASE,
+        ):
+            periods[{"punta": "P1", "llano": "P2", "valle": "P3"}[label.casefold()]] = normalize_number(value)
+        return periods
+
+    # Holaluz Classic: each row has previous reading, current reading, consumption.
+    if re.search(r"les\s+teves\s+lectures|tus\s+lecturas", text, re.IGNORECASE):
+        if words:
+            for label in words:
+                if not re.fullmatch(r"P[123]", label[5], re.IGNORECASE):
+                    continue
+                row = " ".join(
+                    word[5] for word in sorted(words, key=lambda word: word[1])
+                    if word[0] == label[0] and abs(word[2] - label[2]) < 3
+                    and word[1] > label[3]
+                )
+                values = re.findall(rf"({NUMBER_PATTERN})\s*kwh", row, re.IGNORECASE)
+                if len(values) == 3:
+                    periods[label[5].upper()] = normalize_number(values[-1])
+            if any(value is not None for value in periods.values()):
+                return periods
+        for period, _, _, consumption in re.findall(
+            rf"\b(P[123])\s+({NUMBER_PATTERN})\s*kwh\s+({NUMBER_PATTERN})\s*kwh\s+({NUMBER_PATTERN})\s*kwh",
+            text, re.IGNORECASE,
+        ):
+            periods[period.upper()] = normalize_number(consumption)
+        return periods
+
     naturgy_periods = {"punta": "P1", "llano": "P2", "valle": "P3"}
     naturgy_consumptions = re.findall(
         rf"consumo\s+electricidad\s+(punta|llano|valle)\s+({NUMBER_PATTERN})\s*kwh",
@@ -714,6 +793,14 @@ def extract_surplus_kwh(text: str) -> float | None:
 
 
 def extract_electricity_tax(text: str) -> float | None:
+    # Holaluz prints taxable base, rate and tax amount, in that order.
+    tax_row = re.search(
+        rf"(?:impost\s+el[eè]ctric|impuesto\s+el[eé]ctrico)\s+{AMOUNT_PATTERN}\s*€\s+\d+(?:[.,]\d+)?\s*%\s+{AMOUNT_PATTERN}\s*€",
+        text, re.IGNORECASE,
+    )
+    if tax_row:
+        return normalize_number(tax_row.group(2))
+
     # Endesa / Energía XXI: "Impuesto electricidad[:]  ( NNN Eur X N% ) ....N,NN €"
     # Primera ocurrència positiva (evita ajustos negatius)
     for m in re.finditer(
@@ -762,6 +849,15 @@ def extract_electricity_tax(text: str) -> float | None:
 
 
 def extract_vat_rate(text: str) -> float | None:
+    # A table row can share a text line with the PDF's left-hand column.
+    m = re.search(
+        rf"\biva[ \t]+{AMOUNT_PATTERN}[ \t]*€[ \t]+"
+        rf"(?P<rate>\d{{1,3}}(?:[.,]\d+)?)[ \t]*%[ \t]+{AMOUNT_PATTERN}[ \t]*€",
+        text, re.IGNORECASE,
+    )
+    if m:
+        return normalize_number(m.group("rate"))
+
     # Busquem la primera línia/fragment que conté "IVA" o "Import IVA" seguit d'un percentatge
     m = re.search(
         r"^\s*(?:import\s+)?iva\b[^%\n]{0,100}?(\d{1,3}(?:[.,]\d+)?)\s*%",
@@ -943,6 +1039,12 @@ def extract_contracted_powers(
     text: str, words: list[tuple[Any, ...]] | None = None
 ) -> dict[str, float | None]:
     powers: dict[str, float | None] = {"P1": None, "P2": None, "P3": None}
+    contracted = re.search(
+        rf"pot[eè]ncia\s+contractada\s*:\s*P1\s*:?\s*({POWER_PATTERN})\s*kw\s+P2\s*:?\s*({POWER_PATTERN})\s*kw",
+        text, re.IGNORECASE,
+    )
+    if contracted:
+        return {"P1": normalize_number(contracted.group(1)), "P2": normalize_number(contracted.group(2)), "P3": None}
 
     # Endesa: "Potencias contratadas: punta-llano N kW; valle N kW"
     endesa_match = re.search(
@@ -1059,6 +1161,33 @@ def extract_contracted_powers(
     return powers
 
 
+def extract_access_tariff(text: str, words: list[tuple[Any, ...]] | None = None) -> str | None:
+    tariff_pattern = re.compile(r"\b(?:2\.?0|3\.0|6\.[1-4])TD\b", re.IGNORECASE)
+    if words:
+        for label in words:
+            if label[5].casefold() != "tarifa":
+                continue
+            label_line = " ".join(
+                word[5] for word in sorted(words, key=lambda word: word[1])
+                if word[0] == label[0] and abs(word[2] - label[2]) < 3
+                and label[1] <= word[1] < label[1] + 180
+            )
+            if not re.search(r"\b(?:acc[eéè]s|acceso)\b", label_line, re.IGNORECASE):
+                continue
+            # Use the label's column: sorted PDF text can join the tariff to a meter number.
+            candidates = sorted(
+                (word for word in words
+                 if word[0] == label[0] and label[2] - 3 <= word[2] < label[4] + 30
+                 and label[1] - 2 <= word[1] < label[1] + 180),
+                key=lambda word: (word[2], word[1]),
+            )
+            for word in candidates:
+                if tariff_pattern.fullmatch(word[5]):
+                    return word[5].upper().replace("20TD", "2.0TD")
+    match = tariff_pattern.search(text)
+    return match.group(0).upper().replace("20TD", "2.0TD") if match else None
+
+
 def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> dict[str, Any]:
     """Apply deterministic extraction rules to native PDF text."""
     result = empty_result()
@@ -1082,6 +1211,24 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     result["electric_tax_rate_percent"] = extract_electricity_tax_rate(text)
     result["self_consumption_surplus_kwh"] = extract_surplus_kwh(text)
 
+    estimated_summary = re.search(r"resumen\s+de\s+tu\s+consumo\s+estimado", text, re.IGNORECASE)
+    calculated_readings = result["retailer"] == "Holaluz" and re.search(
+        r"(?:[úu]ltima\s+lectura|lectura\s+actual).{0,100}?\bcalculad[ao]\b",
+        text, re.IGNORECASE | re.DOTALL,
+    )
+    if estimated_summary or calculated_readings:
+        add_issue(result, "energy_by_periods", "estimated_consumption", "El consum indicat a la factura és estimat")
+
+    if result["retailer"] == "Holaluz":
+        total_consumption = re.search(
+            rf"(?:\btotal\s*:\s*|(?:has\s+utilitzat|has\s+consumido)\s+)({NUMBER_PATTERN})\s*kwh",
+            text, re.IGNORECASE,
+        )
+        energy = result["energy_by_periods"]
+        if total_consumption and all(value is not None for value in energy.values()):
+            if abs(sum(energy.values()) - normalize_number(total_consumption.group(1))) > 0.01:
+                add_issue(result, "energy_by_periods", "consumption_total_mismatch", "La suma dels consums per període no coincideix amb el total de la factura.")
+
     for field in ("retailer", "cups", "titular", "billing_days", "competitor_invoice_amount"):
         if result[field] is None:
             add_issue(result, field, "missing_or_unverified", "No s'ha pogut extreure i validar el camp.")
@@ -1095,16 +1242,19 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
         if result[field] is None:
             add_issue(result, field, "missing_or_unverified", f"No s'ha pogut verificar l'import de {label} abans d'impostos i amb descomptes. És opcional; cal revisar-lo per proposar el motiu automàtic.")
 
+    access_tariff = extract_access_tariff(text, words)
     # Contracted power is implemented progressively for each retailer.
     for period, value in result["contracted_power_kw_by_periods"].items():
+        # These Holaluz layouts have two contracted-power periods, not three.
+        if period == "P3" and result["retailer"] == "Holaluz" and access_tariff == "2.0TD" and all(
+            result["contracted_power_kw_by_periods"][key] is not None for key in ("P1", "P2")
+        ):
+            continue
         if value is None:
             add_issue(result, f"contracted_power_kw_by_periods.{period}", "missing_or_unverified", "No s'ha pogut extreure la potència contractada.")
 
     if result["meter_rental_eur"] is None:
         add_issue(result, "meter_rental_eur", "missing_or_unverified", "No s'ha pogut extreure el lloguer del comptador.")
-
-    if result["vat_amount"] is None:
-        add_issue(result, "vat_amount", "missing_or_unverified", "No s'ha pogut extreure l'import de l'IVA.")
 
     if result["vat_rate_percent"] is None:
         add_issue(result, "vat_rate_percent", "missing_or_unverified", "No s'ha pogut extreure el percentatge d'IVA.")

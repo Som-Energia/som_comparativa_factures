@@ -40,6 +40,7 @@ const reviewableFormFields = new Set([
   'vat_rate_percent',
   'electric_tax_rate_percent',
   'self_consumption_surplus_kwh',
+  'energy_by_periods',
   'energy_by_periods.P1',
   'energy_by_periods.P2',
   'energy_by_periods.P3',
@@ -596,6 +597,11 @@ function CompareScreen() {
 
           <section className="form-section">
             <h3>Energia</h3>
+            {extractionIssues.filter((issue) => issue.field === 'energy_by_periods').map((issue) => (
+              <p key={issue.code} className="field-issue" role="status">
+                {issue.code === 'estimated_consumption' ? 'El consum indicat a la factura és estimat' : issue.message}
+              </p>
+            ))}
             <div className="period-grid">
               {['P1', 'P2', 'P3'].map((period) => (
                 <label key={period}>
