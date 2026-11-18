@@ -27,6 +27,10 @@ NUMBER_PATTERN = r"\d{1,3}(?:\.\d{3})*,\d{2,3}|\d+(?:[.,]\d{2,3})?"
 POWER_PATTERN = r"\d{1,3}(?:\.\d{3})*,\d+|\d+(?:[.,]\d+)?"
 AMOUNT_PATTERN = rf"({NUMBER_PATTERN})"
 DATE_PATTERN = r"(\d{2}/\d{2}/\d{4})"
+NAMED_ENERGY_PERIODS = {"punta": "P1", "pla": "P2", "llano": "P2", "vall": "P3", "valle": "P3"}
+NAMED_ENERGY_PERIOD_PATTERN = r"punta|pla|llano|vall|valle"
+ENDESA_ELECTRICITY_TAX_LABEL = r"(?:impuesto\s+electricidad|impost\s+electricitat)"
+ENDESA_METER_RENTAL_LABEL = r"(?:alquiler\s+del\s+contador|lloguer\s+del\s+comptador)"
 CATALAN_MONTHS = {
     "gener": 1,
     "febrer": 2,
@@ -364,7 +368,7 @@ def extract_titular(text: str, words: list[tuple[Any, ...]] | None = None) -> st
                 return value
 
     contract_holder = re.search(
-        r"(?:^|\n)\s*titular\s+del\s+contrato\s*:\s*(.+?)(?=\s+(?:nif|direcci[oó]n)\s*:|\s{2,}|\n|$)",
+        r"(?:^|\n)\s*titular\s+del\s+(?:contrato|contracte)\s*:\s*(.+?)(?=\s+(?:nif|direcci[oó]n|cups)\s*:|\s{2,}|\n|$)",
         text,
         re.IGNORECASE,
     )
@@ -387,6 +391,15 @@ def extract_titular(text: str, words: list[tuple[Any, ...]] | None = None) -> st
 def extract_billing_days(
     text: str, words: list[tuple[Any, ...]] | None = None
 ) -> tuple[int | None, bool]:
+    explicit_period = re.search(
+        r"\bper[ií]od[oe](?:\s+de\s+facturaci[oó](?:n)?)?\s*:\s*"
+        r"[^\n()]{0,100}?\(\s*(\d{1,3})\s+(?:dies|d[ií]as)\s*\)",
+        text,
+        re.IGNORECASE,
+    )
+    if explicit_period:
+        return int(explicit_period.group(1)), False
+
     for billing_period, months in (
         (CATALAN_BILLING_PERIOD_PATTERN.search(text), CATALAN_MONTHS),
         (SPANISH_BILLING_PERIOD_PATTERN.search(text), SPANISH_MONTHS),
@@ -495,14 +508,6 @@ def extract_billing_days(
         start = datetime.strptime(factor_period.group(1), "%d/%m/%Y").date()
         end = datetime.strptime(factor_period.group(2), "%d/%m/%Y").date()
         return (end - start).days, False
-
-    explicit_period = re.search(
-        r"\bperiodo(?:\s+de\s+facturaci[oó]n)?\s*:\s*[^\n()]{0,100}?\(\s*(\d{1,3})\s+d[ií]as\s*\)",
-        text,
-        re.IGNORECASE,
-    )
-    if explicit_period:
-        return int(explicit_period.group(1)), False
 
     direct = re.search(r"(?:dies\s+facturats|d[ií]as?\s+(?:facturados|de\s+facturaci[oó]n)|billing\s+days)\s*[:\-]?\s*(\d{1,3})", text, re.IGNORECASE)
     if direct:
@@ -718,14 +723,23 @@ def extract_energy_by_periods(
                 "P3": normalize_number(consumptions[2]),
             }
 
-    endesa_periods = {"punta": "P1", "llano": "P2", "valle": "P3"}
+    endesa_consumptions = re.findall(
+        rf"\bconsum(?:o)?\s+({NAMED_ENERGY_PERIOD_PATTERN})\s+({NUMBER_PATTERN})\s*kwh\b",
+        text,
+        re.IGNORECASE,
+    )
+    for label, value in endesa_consumptions:
+        periods[NAMED_ENERGY_PERIODS[label.casefold()]] = normalize_number(value)
+    if all(value is not None for value in periods.values()):
+        return periods
+
     for line in text.splitlines():
-        period_match = re.match(r"\s*(punta|llano|valle)\b", line, re.IGNORECASE)
+        period_match = re.match(rf"\s*({NAMED_ENERGY_PERIOD_PATTERN})\b", line, re.IGNORECASE)
         if not period_match:
             continue
         values = re.findall(rf"-?{NUMBER_PATTERN}", line)
         if len(values) >= 5:
-            periods[endesa_periods[period_match.group(1).casefold()]] = normalize_number(
+            periods[NAMED_ENERGY_PERIODS[period_match.group(1).casefold()]] = normalize_number(
                 values[-1]
             )
 
@@ -743,9 +757,8 @@ def extract_energy_by_periods(
             periods[billed_period.group(1)] = normalize_number(billed_period.group(2))
 
     if words:
-        spanish_periods = {"punta": "P1", "llano": "P2", "valle": "P3"}
         for label in words:
-            period = spanish_periods.get(label[5].lower().rstrip(":"))
+            period = NAMED_ENERGY_PERIODS.get(label[5].lower().rstrip(":"))
             if period is None:
                 continue
             readings = sorted(
@@ -804,7 +817,7 @@ def extract_electricity_tax(text: str) -> float | None:
     # Endesa / Energía XXI: "Impuesto electricidad[:]  ( NNN Eur X N% ) ....N,NN €"
     # Primera ocurrència positiva (evita ajustos negatius)
     for m in re.finditer(
-        rf"impuesto\s+electricidad\s*:?\s*\([^)]+\)\s*\.{{2,}}\s*(-?{AMOUNT_PATTERN[1:-1]})\s*€",
+        rf"{ENDESA_ELECTRICITY_TAX_LABEL}\s*:?\s*\([^)]+\)\s*\.{{2,}}\s*(-?{AMOUNT_PATTERN[1:-1]})\s*€",
         text, re.IGNORECASE,
     ):
         val = normalize_number(m.group(1))
@@ -892,7 +905,7 @@ def extract_igic(text: str) -> tuple[list[dict[str, float | str]], float | None]
 def extract_electricity_tax_rate(text: str) -> float | None:
     # Endesa / E21: "Impuesto electricidad ( NNN Eur X N,N% )"
     m = re.search(
-        r"impuesto\s+electricidad\s*:?\s*\([^)]*?(\d{1,3}(?:[.,]\d+)?)\s*%",
+        rf"{ENDESA_ELECTRICITY_TAX_LABEL}\s*:?\s*\([^)]*?(\d{{1,3}}(?:[.,]\d+)?)\s*%",
         text, re.IGNORECASE,
     )
     if m:
@@ -977,7 +990,7 @@ def extract_vat_amount(text: str) -> float | None:
 def extract_meter_rental(text: str) -> float | None:
     # Endesa: "Alquiler del contador ( N días x N €/día ) ....N,NN €"
     m = re.search(
-        rf"alquiler\s+del\s+contador\s*\([^)]+\)\s*\.+\s*({AMOUNT_PATTERN[1:-1]})\s*€",
+        rf"{ENDESA_METER_RENTAL_LABEL}\s*\([^)]+\)\s*\.+\s*({AMOUNT_PATTERN[1:-1]})\s*€",
         text, re.IGNORECASE,
     )
     if m:
@@ -985,7 +998,7 @@ def extract_meter_rental(text: str) -> float | None:
 
     # Energía XXI: "Alquiler del contador: ( N días x N €/día ) ....N,NN €"
     m = re.search(
-        rf"alquiler\s+del\s+contador\s*:\s*\([^)]+\)\s*\.+\s*({AMOUNT_PATTERN[1:-1]})\s*€",
+        rf"{ENDESA_METER_RENTAL_LABEL}\s*:\s*\([^)]+\)\s*\.+\s*({AMOUNT_PATTERN[1:-1]})\s*€",
         text, re.IGNORECASE,
     )
     if m:
@@ -1048,9 +1061,9 @@ def extract_contracted_powers(
 
     # Endesa: "Potencias contratadas: punta-llano N kW; valle N kW"
     endesa_match = re.search(
-        rf"potencias?\s+contratadas?\s*:\s*"
-        rf"punta[- ]llano\s+({POWER_PATTERN})\s*kw\s*;\s*"
-        rf"valle\s+({POWER_PATTERN})\s*kw\b",
+        rf"pot[eè]nci[ae]s?\s+(?:contratadas?|contractad[ae]s?)\s*:\s*"
+        rf"punta[- ](?:llano|pla)\s+({POWER_PATTERN})\s*kw\s*;\s*"
+        rf"(?:valle|vall)\s+({POWER_PATTERN})\s*kw\b",
         text,
         re.IGNORECASE,
     )
