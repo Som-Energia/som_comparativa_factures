@@ -627,7 +627,7 @@ function CompareScreen() {
                 name="self_consumption_surplus_kwh"
                 autoComplete="on"
                 min="0"
-                step="0.01"
+                step="0.001"
                 value={form.self_consumption_surplus_kwh}
                 onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
                 onBlur={(event) => {

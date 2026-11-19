@@ -8,6 +8,7 @@ import json
 import re
 import sys
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,11 @@ NAMED_ENERGY_PERIOD_PATTERN = r"punta|pla|llano|vall|valle"
 ENDESA_ELECTRICITY_TAX_LABEL = r"(?:impuesto\s+electricidad|impost\s+electricitat)"
 ENDESA_METER_RENTAL_LABEL = r"(?:alquiler\s+del\s+contador|lloguer\s+del\s+comptador)"
 EQUIPMENT_RENTAL_LABEL = r"alquiler\s+(?:de\s+)?equipos?(?:\s+(?:de\s+)?medida(?:\s+y\s+control)?)?"
+SURPLUS_LABEL_PATTERN = (
+    r"(?:compensaci[oó](?:n)?\s+(?:(?:de|d['’])\s*)?excedent(?:e)?s?"
+    r"|valoraci[oó]n\s+excedentes?"
+    r"|excedentes?\s+de\s+(?:autoconsumo|energ[ií]a\s+generada))\b"
+)
 CATALAN_MONTHS = {
     "gener": 1,
     "febrer": 2,
@@ -864,7 +870,24 @@ def extract_energy_by_periods(
 
 def extract_surplus_kwh(text: str) -> float | None:
     # Patró numèric flexible per a kWh d'excedents: enters, 1 decimal o més
-    kwh_pat = r"-?\d{1,3}(?:\.\d{3})*(?:[.,]\d+)?"
+    kwh_pat = r"-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:[.,]\d+)?"
+    # Pepeenergy bills each period inside a dedicated block; readings elsewhere
+    # are cumulative and must not be substituted for incomplete billed quantities.
+    block = re.search(
+        r"excedentes\s+de\s+energ[ií]a\s+generada\b(?P<details>.*?)"
+        r"(?=\b(?:cuota\s+pepeenergy|otros\s+costes|impuesto|iva|total|generaci[oó]n|historial)\b|\Z)",
+        text, re.IGNORECASE | re.DOTALL,
+    )
+    if block:
+        rows = re.findall(
+            rf"\bper[ií]odo\s+(P[123])\s*\([^\n)]+\)[^\n]*?"
+            rf"(?:€|eur)\s*/\s*kwh\s*[×x*]\s*({kwh_pat})\s*kwh\b",
+            block.group("details"), re.IGNORECASE,
+        )
+        if len(rows) == 3 and {period.upper() for period, _ in rows} == {"P1", "P2", "P3"}:
+            return float(sum(abs(Decimal(str(normalize_number(value)))) for _, value in rows))
+        return None
+
     patterns = [
         # Endesa: "Compensación excedente NNN,NNN kWh x -N €/kWh"
         rf"compensaci[oó]n\s+excedentes?\s+({kwh_pat})\s*kwh",
@@ -1315,6 +1338,11 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     result["electricity_tax"] = extract_electricity_tax(text)
     result["electric_tax_rate_percent"] = extract_electricity_tax_rate(text)
     result["self_consumption_surplus_kwh"] = extract_surplus_kwh(text)
+    if result["self_consumption_surplus_kwh"] is None and re.search(SURPLUS_LABEL_PATTERN, text, re.IGNORECASE):
+        add_issue(
+            result, "self_consumption_surplus_kwh", "missing_or_unverified",
+            "La factura indica excedents, però no se n'ha pogut extreure la quantitat. Cal revisar-la.",
+        )
 
     estimated_summary = re.search(r"resumen\s+de\s+tu\s+consumo\s+estimado", text, re.IGNORECASE)
     calculated_readings = result["retailer"] == "Holaluz" and re.search(
