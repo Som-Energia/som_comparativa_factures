@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.config import load_pricing_config
+from app.services.comparison_reason import suggest_comparison_reason
 
 
 TWOPLACES = Decimal("0.01")
@@ -27,6 +28,8 @@ class ComparisonInput:
     meter_rental_eur: Decimal
     vat_rate: Decimal
     electric_tax_rate: Decimal
+    competitor_energy_eur: Decimal | None
+    competitor_power_eur: Decimal | None
 
 
 def build_comparison_report(payload: dict) -> dict:
@@ -105,6 +108,8 @@ def build_comparison_report(payload: dict) -> dict:
         "input": {
             "billing_days": data.billing_days,
             "competitor_invoice_amount": float(data.competitor_invoice_amount),
+            "competitor_energy_eur": float(data.competitor_energy_eur) if data.competitor_energy_eur is not None else None,
+            "competitor_power_eur": float(data.competitor_power_eur) if data.competitor_power_eur is not None else None,
             "energy_by_periods": {period: float(kwh) for period, kwh in data.energy_by_periods.items()},
             "contracted_power_kw_by_periods": {
                 period: float(kw) for period, kw in data.contracted_power_kw_by_periods.items()
@@ -128,6 +133,9 @@ def build_comparison_report(payload: dict) -> dict:
             "savings": float(savings),
             "savings_label": "Estalvi" if savings >= 0 else "Diferencia",
         },
+        "reason_suggestion": suggest_comparison_reason(
+            savings, data.competitor_energy_eur, data.competitor_power_eur, energy_total, power_total,
+        ),
         "breakdown": {
             "energy": energy_breakdown,
             "power": power_breakdown,
@@ -145,14 +153,14 @@ def build_comparison_report(payload: dict) -> dict:
                 "vat_eur": float(vat_tax),
             },
             "totals": [
-                {"label": "Cost per l'energia utilitzada", "amount": float(energy_total)},
+                {"label": "Import del consum", "amount": float(energy_total)},
                 *[
-                    {"label": f"Cost de potència {item['period']}", "amount": item["amount"]}
+                    {"label": f"Import de la potència {item['period']}", "amount": item["amount"]}
                     for item in power_breakdown
                 ],
-                {"label": "Cost Serveis d'Ajust", "amount": float(adjustment_service)},
+                {"label": "Import dels serveis d’ajust", "amount": float(adjustment_service)},
                 {"label": "Bo Social", "amount": float(social_bonus)},
-                {"label": "Cost del lloguer del comptador", "amount": float(meter_rental)},
+                {"label": "Import del lloguer del comptador", "amount": float(meter_rental)},
                 {"label": "Compensació d'excedents", "amount": float(-compensation_applied)},
                 {"label": f"Impost elèctric {data.electric_tax_rate * 100}%", "amount": float(electric_tax)},
                 {"label": f"IVA {data.vat_rate * 100}%", "amount": float(vat_tax)},
@@ -241,6 +249,21 @@ def _validate_payload(payload: dict) -> ComparisonInput:
         errors,
     )
 
+    competitor_costs = {}
+    for kind, label in [("energy", "consum"), ("power", "potència")]:
+        field = f"competitor_{kind}_eur"
+        raw_value = payload.get(field)
+        value = None
+        if raw_value not in (None, ""):
+            try:
+                value = Decimal(str(raw_value))
+                if not value.is_finite() or value < 0:
+                    raise ValueError
+                value = _money(value)
+            except (TypeError, ValueError, ArithmeticError):
+                errors[field] = f"L'import de {label} actual ha de ser un nombre positiu o zero."
+        competitor_costs[field] = value
+
     if errors:
         raise ComparisonInputError(errors)
 
@@ -255,6 +278,7 @@ def _validate_payload(payload: dict) -> ComparisonInput:
         meter_rental_eur=meter_rental_eur,
         vat_rate=vat_rate,
         electric_tax_rate=electric_tax_rate,
+        **competitor_costs,
     )
 
 

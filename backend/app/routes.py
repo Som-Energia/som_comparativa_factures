@@ -24,12 +24,12 @@ from .config import (
 )
 from .services.calculator import ComparisonInputError, build_comparison_report
 from .services.invoice_extractor import extract_pdf
-from .services.reporting import render_report_html, render_report_html_for_bundle, render_report_pdf
+from .services.reporting import render_report_html_for_bundle, render_report_pdf
 
 
 api = Blueprint("api", __name__)
 
-SAMPLE_PREVIEW_PAYLOAD = {
+TEMPLATE_SAMPLE_PAYLOAD = {
     "cups": "ES0210002100000000ZN0F",
     "titular": "Persona Persona",
     "billing_days": 30,
@@ -139,58 +139,6 @@ def comparison_report_pdf():
     )
 
 
-@api.get("/reports/comparison.preview")
-def comparison_report_preview():
-    template_version = _extract_template_version(request.args)
-    if isinstance(template_version, Response):
-        return template_version
-    locale = _extract_locale(request.args)
-    if isinstance(locale, Response):
-        return locale
-    audience = _extract_audience(request.args)
-    if isinstance(audience, Response):
-        return audience
-
-    report = build_comparison_report(SAMPLE_PREVIEW_PAYLOAD)
-
-    try:
-        html = render_report_html(report, template_version=template_version, locale=locale, audience=audience)
-    except TemplateValidationError as exc:
-        return jsonify({"errors": {"template_version": str(exc)}}), 422
-    except TemplateResolutionError as exc:
-        return jsonify({"errors": {"template_version": str(exc)}}), 404
-
-    return Response(html, mimetype="text/html")
-
-
-@api.post("/reports/comparison.preview")
-def comparison_report_preview_from_payload():
-    payload = request.get_json(silent=True) or {}
-    template_version = _extract_template_version(payload)
-    if isinstance(template_version, Response):
-        return template_version
-    locale = _extract_locale(payload)
-    if isinstance(locale, Response):
-        return locale
-    audience = _extract_audience(payload)
-    if isinstance(audience, Response):
-        return audience
-
-    try:
-        report = build_comparison_report(payload)
-    except ComparisonInputError as exc:
-        return jsonify({"errors": exc.errors}), 400
-
-    try:
-        html = render_report_html(report, template_version=template_version, locale=locale, audience=audience)
-    except TemplateValidationError as exc:
-        return jsonify({"errors": {"template_version": str(exc)}}), 422
-    except TemplateResolutionError as exc:
-        return jsonify({"errors": {"template_version": str(exc)}}), 404
-
-    return Response(html, mimetype="text/html")
-
-
 @api.get("/templates/comparison/publication")
 def comparison_template_publication_status():
     try:
@@ -284,7 +232,7 @@ def comparison_template_preview_version(version: str):
     if isinstance(files, Response):
         return files
 
-    report = build_comparison_report(SAMPLE_PREVIEW_PAYLOAD)
+    report = build_comparison_report(TEMPLATE_SAMPLE_PAYLOAD)
 
     try:
         bundle = preview_comparison_template_version(version, files)
@@ -367,6 +315,8 @@ def _build_comparison_input(extraction: dict) -> dict:
         "titular": extraction["titular"],
         "billing_days": extraction["billing_days"],
         "competitor_invoice_amount": extraction["competitor_invoice_amount"],
+        "competitor_energy_eur": extraction.get("competitor_energy_eur"),
+        "competitor_power_eur": extraction.get("competitor_power_eur"),
         "energy_by_periods": extraction["energy_by_periods"],
         "contracted_power_kw_by_periods": {
             "P1": powers["P1"],

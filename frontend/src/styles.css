@@ -98,6 +98,37 @@ small {
   min-width: 0;
 }
 
+.email-composer {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+
+#email-heading {
+  scroll-margin-top: 24px;
+}
+
+.email-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.3fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.email-fields,
+.email-result {
+  min-width: 0;
+}
+
+.email-fields .two-column-grid {
+  grid-template-columns: 1fr;
+}
+
+.email-document {
+  overflow-x: auto;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-card);
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
@@ -549,7 +580,8 @@ label:has(.field-issue) input {
 
 @media (max-width: 1100px) {
   .layout,
-  .editor-layout {
+  .editor-layout,
+  .email-workspace {
     grid-template-columns: 1fr;
   }
 }

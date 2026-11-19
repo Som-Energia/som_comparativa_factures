@@ -1,6 +1,5 @@
 from pathlib import Path
 import json
-from html import unescape
 from unittest.mock import Mock
 
 import fitz
@@ -144,16 +143,11 @@ def test_pdf_audience_preserves_master_pages_and_calculated_amounts(locale, audi
         assert title in text
         assert len(document[2].get_links()) == 2
 
-    preview = client.post("/api/reports/comparison.preview", json=payload)
-    assert preview.status_code == 200
-    assert title in preview.get_data(as_text=True)
-
 
 @pytest.mark.parametrize("audience", [None, [], "company", 1])
-@pytest.mark.parametrize("endpoint", ["comparison.pdf", "comparison.preview"])
-def test_report_rejects_invalid_audience(audience, endpoint):
+def test_report_rejects_invalid_audience(audience):
     response = create_app().test_client().post(
-        f"/api/reports/{endpoint}", json=_payload() | {"audience": audience}
+        "/api/reports/comparison.pdf", json=_payload() | {"audience": audience}
     )
     assert response.status_code == 400
     assert "audience" in response.get_json()["errors"]
@@ -195,10 +189,6 @@ def test_all_pdf_variants_include_weighted_adjustment_notice(version, locale, au
             for block in page.get_text("blocks"):
                 if "Red Eléctrica Española" in block[4] or "solo es válida" in block[4] or "només és vàlida" in block[4]:
                     assert block[3] < footer_top
-
-    preview = client.post("/api/reports/comparison.preview", json=payload)
-    assert preview.status_code == 200
-    assert expected in unescape(preview.get_data(as_text=True))
 
 
 @pytest.mark.parametrize("price, expected", [(0, "0 €"), (0.025, "0,025 €")])
