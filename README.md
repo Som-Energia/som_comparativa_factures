@@ -26,6 +26,40 @@ Per exemple, per fer que el botó principal sigui lila:
 
 La tipografia Outfit s'empaqueta amb l'aplicació (`@fontsource-variable/outfit`) i el logo i el favicon són a `frontend/public/`. Els PDF tenen el seu propi tema a `backend/config/pdf_templates/`.
 
+## Preparar el correu de la comparativa
+
+1. Carregueu una factura o introduïu les dades i premeu **Veure resum**.
+2. A **Preparar correu**, reviseu la comercialitzadora extreta i completeu les característiques que falten. Els camps buits apareixen com a «No disponible».
+3. Reviseu el correu preparat al costat dels camps; el redactat i els enllaços són els del model predefinit.
+4. Premeu **Copiar correu amb format** a la capçalera de l’apartat, enganxeu-lo al gestor de correu i adjunteu-hi el PDF descarregat. Si el navegador no permet copiar amb format automàticament, el contingut queda seleccionat per copiar-lo amb Ctrl+C o Cmd+C.
+
+El correu es prepara en català o castellà segons l’idioma del PDF, amb plantilles diferents per a estalvi i sobrecost i un redactat neutre per a la igualtat. Cada nou càlcul o canvi d’idioma reinicia l’esborrany; si canvieu les dades del formulari, cal recalcular abans de copiar. L’esborrany és temporal i es perd en sortir de la pantalla. La taula reutilitza els tokens visuals de l’aplicació i es copia amb estils inline per als clients de correu.
+
+### Proposta automàtica del motiu
+
+Els camps **Import del consum — companyia actual** i **Import de la potència — companyia actual** s’omplen des del PDF quan l’extracció és prou clara. Són opcionals, es poden corregir al formulari i no alteren el total de la simulació. Han de correspondre al mateix període, abans d’impostos, amb els descomptes aplicats i sense compensació d’excedents ni serveis addicionals o d’ajust facturats separadament.
+
+En prémer **Veure resum**, es preselecciona consum, potència o tots dos segons la comparació amb els imports de Som Energia. Podeu canviar-ho, deixar-ho **Sense especificar** o prémer **Restablir proposta automàtica**.
+
+- Calen els dos imports; l’absència d’un import no es tracta com un zero.
+- Les diferències de fins a 0,02 € es tracten com a arrodoniment per a aquesta proposta.
+- Per atribuir el motiu principal, la diferència neta de consum i potència abans d’impostos ha de tenir el mateix sentit que el resultat i explicar almenys la meitat de la diferència total. És un criteri conservador, sense assumir les bases fiscals de l’altra companyia.
+- Quotes fixes sense desglossament comercial, imports contradictoris i descomptes no atribuïbles queden pendents de revisió. Els peatges i càrrecs informatius no substitueixen els imports comercials.
+
+En aquesta entrega, els nous imports de **Holaluz** queden pendents perquè la seva extracció s’incorporarà amb la branca `IMP_extractor_hl_en`. Es poden completar manualment per obtenir la proposta del motiu. El suport de Holaluz que ja existia es conserva. **Canàries queda fora de l’abast** fins que el formulari estigui adaptat a la seva fiscalitat.
+
+La funció substitueix l’obertura del preview HTML de la comparativa. El preview en viu de l’editor de plantilles PDF es manté.
+
+### Compatibilitat amb FreeScout
+
+El correu es genera en Arial de 16 px amb interlineat de 24 px. Les cel·les dels conceptes utilitzen `td` amb `align="left"` perquè el filtre de FreeScout no les converteixi en capçaleres centrades sense alineació.
+
+El [filtre estàndard de FreeScout](https://github.com/freescout-help-desk/freescout/blob/dist/config/purifier.php) elimina `line-height`. En un missatge rebut de prova això feia que el text de 16 px heretés els 19 px d’interlineat del contenidor exterior. Els espais entre paràgrafs i després de la taula sí que es conservaven.
+
+Per conservar els 24 px entre línies, qui administra **FreeScout** ha d’afegir `line-height` a la llista existent `settings.default.CSS.AllowedProperties` del seu `config/purifier.php`, mantenint la resta de propietats, i executar `php artisan freescout:clear-cache` al directori de FreeScout. Aquest ajust pertany a la instal·lació de FreeScout i s’ha de conservar en les seves actualitzacions; no s’aplica des d’aquest repositori.
+
+Després cal copiar un correu nou, enganxar-lo en una resposta buida i enviar-lo a Gmail. Al missatge rebut s’ha de comprovar que les cel·les dels conceptes siguin `td` alineades a l’esquerra i que els paràgrafs conservin `line-height:24px`. El shorthand `font:16px/24px Arial` no resol el bloqueig: Chrome el descompon en propietats separades en enganxar i el filtre torna a eliminar l’interlineat.
+
 ## Contracte minim d'entrada de comparativa
 
 ```json
@@ -52,6 +86,8 @@ La tipografia Outfit s'empaqueta amb l'aplicació (`@fontsource-variable/outfit`
 
 ## Backend
 
+El contracte de comparativa també admet `competitor_energy_eur` i `competitor_power_eur`, imports opcionals no negatius en EUR. Es poden ometre o enviar com a `null` o cadena buida. La resposta de `/api/compare` els conserva a `input` i afegeix `reason_suggestion`, amb `reason` (`energy`, `power`, `both` o cadena buida), `status` (`suggested`, `missing_data`, `other_costs`, `no_difference`) i les diferències per concepte, positives quan Som Energia és més econòmica.
+
 ```bash
 cd backend
 poetry install
@@ -65,7 +101,6 @@ Endpoints:
 - `POST /api/invoices/extract`: API externa protegida. Rep el mateix camp `pdf`, requereix `Authorization: Bearer <INVOICE_EXTRACTOR_API_TOKEN>` i retorna les dades extretes amb les claus del contracte de comparativa.
 - `POST /api/reports/comparison.pdf`: retorna el PDF.
   - Admet `locale: "ca"` (valor per defecte) o `locale: "es"` per escollir l'idioma del document.
-- `GET /api/reports/comparison.preview`: retorna HTML renderitzat de preview amb dades de mostra i una versio publicada o seleccionada.
 - `GET /api/pricing`: retorna la configuració de preus activa que s'aplica als càlculs, incloent la data efectiva i la darrera sincronització ERP.
 - `GET /api/health`: healthcheck.
 
@@ -86,6 +121,8 @@ La resposta inclou les claus del contracte d'entrada de comparativa i conserva d
   "titular": "Persona Persona",
   "billing_days": 30,
   "competitor_invoice_amount": 54.0,
+  "competitor_energy_eur": 30.0,
+  "competitor_power_eur": 10.0,
   "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
   "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3, "P3": 2.3},
   "self_consumption_surplus_kwh": null,

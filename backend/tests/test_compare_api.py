@@ -114,15 +114,35 @@ def test_compare_returns_validation_errors_for_invalid_payload():
     }
 
 
-def test_comparison_html_preview_renders_submitted_payload():
-    app = create_app()
-    client = app.test_client()
+def test_component_costs_are_optional_and_do_not_change_simulation_total():
+    client = create_app().test_client()
+    base = client.post('/api/compare', json=build_payload()).get_json()
+    body = client.post('/api/compare', json=build_payload(competitor_energy_eur=40, competitor_power_eur=20)).get_json()
+    assert body['comparison'] == base['comparison']
+    assert base['reason_suggestion']['status'] == 'missing_data'
+    assert body['reason_suggestion']['reason'] == 'both'
+    assert body['input']['competitor_energy_eur'] == 40
+    assert body['input']['competitor_power_eur'] == 20
 
-    response = client.post("/api/reports/comparison.preview", json=build_payload(titular="Persona JSON"))
 
+@pytest.mark.parametrize('value', [-1, 'NaN', 'Infinity', 'abc', True])
+def test_component_costs_reject_non_finite_negative_or_non_numeric_values(value):
+    response = create_app().test_client().post('/api/compare', json=build_payload(competitor_energy_eur=value))
+    assert response.status_code == 400
+    assert 'competitor_energy_eur' in response.get_json()['errors']
+
+
+@pytest.mark.parametrize('value', [None, '', 0])
+def test_optional_component_costs_accept_absence_and_zero(value):
+    response = create_app().test_client().post('/api/compare', json=build_payload(competitor_energy_eur=value))
     assert response.status_code == 200
-    assert response.mimetype == "text/html"
-    assert "Persona JSON" in response.get_data(as_text=True)
+    assert response.get_json()['input']['competitor_energy_eur'] == (0 if value == 0 else None)
+
+
+def test_comparison_html_preview_has_been_removed():
+    client = create_app().test_client()
+    assert client.get("/api/reports/comparison.preview").status_code == 404
+    assert client.post("/api/reports/comparison.preview", json=build_payload()).status_code == 404
 
 
 def test_comparison_pdf_rejects_an_unsupported_locale():
@@ -491,6 +511,8 @@ def build_extraction():
         "titular": "Persona Persona",
         "billing_days": 30,
         "competitor_invoice_amount": 54.0,
+        "competitor_energy_eur": 30.0,
+        "competitor_power_eur": 10.0,
         "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
         "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3, "P3": 2.3},
         "meter_rental_eur": 0.81,
@@ -544,6 +566,8 @@ def test_internal_extraction_returns_the_comparison_input():
         "titular": "Persona Persona",
         "billing_days": 30,
         "competitor_invoice_amount": 54.0,
+        "competitor_energy_eur": 30.0,
+        "competitor_power_eur": 10.0,
         "energy_by_periods": {"P1": 34.41, "P2": 41.55, "P3": 88.63},
         "contracted_power_kw_by_periods": {"P1": 2.3, "P2": 2.3},
         "self_consumption_surplus_kwh": None,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import EmailComposer from './EmailComposer'
 
 const apiBaseUrl = '/api'
 const appVersion = __APP_VERSION__
@@ -8,6 +9,8 @@ const initialForm = {
   titular: '',
   billing_days: '',
   competitor_invoice_amount: '',
+  competitor_energy_eur: '',
+  competitor_power_eur: '',
   locale: 'ca',
   audience: 'individual',
   template_version: '',
@@ -31,6 +34,8 @@ const reviewableFormFields = new Set([
   'titular',
   'billing_days',
   'competitor_invoice_amount',
+  'competitor_energy_eur',
+  'competitor_power_eur',
   'meter_rental_eur',
   'vat_rate_percent',
   'electric_tax_rate_percent',
@@ -95,7 +100,9 @@ function CompareScreen() {
   const [preview, setPreview] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [downloading, setDownloading] = useState(false)
-  const [openingHtmlPreview, setOpeningHtmlPreview] = useState(false)
+  const [retailer, setRetailer] = useState('')
+  const [calculatedPayload, setCalculatedPayload] = useState('')
+  const [calculationId, setCalculationId] = useState(0)
   const [extractingInvoice, setExtractingInvoice] = useState(false)
   const [extractionIssues, setExtractionIssues] = useState([])
   const [extractedFileName, setExtractedFileName] = useState('')
@@ -209,6 +216,8 @@ function CompareScreen() {
       titular: form.titular,
       billing_days: numberOrEmpty(form.billing_days),
       competitor_invoice_amount: numberOrEmpty(form.competitor_invoice_amount),
+      competitor_energy_eur: numberOrEmpty(form.competitor_energy_eur),
+      competitor_power_eur: numberOrEmpty(form.competitor_power_eur),
       locale: form.locale,
       audience: form.audience,
       energy_by_periods: {
@@ -247,6 +256,7 @@ function CompareScreen() {
     setInputMode(mode)
     setErrors({})
     setPreview(null)
+    setRetailer('')
   }
 
   async function handleInvoiceUpload(event) {
@@ -293,6 +303,8 @@ function CompareScreen() {
         titular: input.titular ?? '',
         billing_days: input.billing_days ?? '',
         competitor_invoice_amount: input.competitor_invoice_amount ?? '',
+        competitor_energy_eur: input.competitor_energy_eur ?? '',
+        competitor_power_eur: input.competitor_power_eur ?? '',
         energy_by_periods: {
           P1: input.energy_by_periods.P1 ?? '',
           P2: input.energy_by_periods.P2 ?? '',
@@ -308,6 +320,7 @@ function CompareScreen() {
         electric_tax_rate_percent: input.electric_tax_rate_percent ?? '',
       }))
       setExtractionIssues(data.extraction.data_quality.issues)
+      setRetailer(data.extraction.retailer || '')
       setExtractedFileName(file.name)
       setInputMode('form')
       setPreview(null)
@@ -344,6 +357,8 @@ function CompareScreen() {
     }
 
     setPreview(data)
+    setCalculatedPayload(JSON.stringify(payload))
+    setCalculationId((current) => current + 1)
   }
 
   async function handleDownload() {
@@ -378,38 +393,11 @@ function CompareScreen() {
     URL.revokeObjectURL(url)
   }
 
-  async function handleOpenHtmlPreview() {
-    const payload = getPayload()
-    if (!payload) {
-      return
-    }
-
-    const previewWindow = window.open('', '_blank')
-    setOpeningHtmlPreview(true)
-    setErrors({})
-
-    const response = await fetch(`${apiBaseUrl}/reports/comparison.preview`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-
-    setOpeningHtmlPreview(false)
-
-    if (!response.ok) {
-      const data = await response.json()
-      previewWindow?.close()
-      setErrors(data.errors || {})
-      return
-    }
-
-    const url = URL.createObjectURL(await response.blob())
-    if (previewWindow) {
-      previewWindow.location.href = url
-    } else {
-      window.open(url, '_blank', 'noopener,noreferrer')
-    }
-    window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+  let reportIsCurrent = false
+  try {
+    reportIsCurrent = calculatedPayload === JSON.stringify(buildPayload())
+  } catch {
+    // Un JSON en curs d'edició encara no correspon a un resultat calculat.
   }
 
   const formIssueFields = new Set(
@@ -487,7 +475,7 @@ function CompareScreen() {
             <h3>Dades de la factura</h3>
             <div className="two-column-grid">
               <label>
-                Import factura competència
+                Import total de la factura — companyia actual (€)
                 <input
                   type="number"
                   name="competitor_invoice_amount"
@@ -561,6 +549,27 @@ function CompareScreen() {
                 <FieldIssue issues={extractionIssues} field="electric_tax_rate_percent" />
               </label>
             </div>
+            <div className="two-column-grid">
+              {[
+                ['competitor_energy_eur', 'Import del consum — companyia actual (€)'],
+                ['competitor_power_eur', 'Import de la potència — companyia actual (€)'],
+              ].map(([field, label]) => (
+                <label key={field}>
+                  {label}
+                  <input
+                    type="number"
+                    name={field}
+                    min="0"
+                    step="0.01"
+                    value={form[field]}
+                    onChange={(event) => updateField(field, event.target.value)}
+                  />
+                  <FieldError error={errors[field]} />
+                  <FieldIssue issues={extractionIssues} field={field} />
+                </label>
+              ))}
+            </div>
+            <p className="field-help">Imports opcionals extrets del PDF per proposar el motiu del correu. Reviseu que siguin del mateix període, abans d’impostos i amb els descomptes aplicats. El consum no ha d’incloure compensació d’excedents ni serveis addicionals o d’ajust facturats separadament. Podeu completar-los o corregir-los; no modifiquen el total de la simulació.</p>
           </section>
 
           <section className="form-section">
@@ -686,14 +695,21 @@ function CompareScreen() {
           </section>
 
           <div className="actions">
-            <button type="submit" disabled={loadingPreview}>
+            <button type="submit" disabled={loadingPreview || extractingInvoice}>
               {loadingPreview ? 'Calculant...' : 'Veure resum'}
             </button>
-            <button type="button" className="secondary" disabled={!preview || downloading} onClick={handleDownload}>
+            <button type="button" className="secondary" disabled={!preview || !reportIsCurrent || downloading || loadingPreview || extractingInvoice} onClick={handleDownload}>
               {downloading ? 'Generant PDF...' : 'Descarregar PDF'}
             </button>
-            <button type="button" className="tertiary" disabled={openingHtmlPreview} onClick={handleOpenHtmlPreview}>
-              {openingHtmlPreview ? 'Obrint preview...' : 'Obrir preview HTML'}
+            <button type="button" className="secondary" disabled={!preview} onClick={() => {
+              const heading = document.getElementById('email-heading')
+              heading?.focus({ preventScroll: true })
+              heading?.scrollIntoView({
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                block: 'start',
+              })
+            }}>
+              Preparar correu
             </button>
           </div>
         </form>
@@ -706,9 +722,9 @@ function CompareScreen() {
         {preview && (
           <>
             <div className="summary-grid">
-              <SummaryItem label="Cost actual" value={formatEuro(preview.comparison.competitor_total)} />
+              <SummaryItem label="Import total actual" value={formatEuro(preview.comparison.competitor_total)} />
               <SummaryItem
-                label="Cost Som Energia"
+                label="Import total amb Som Energia"
                 value={formatEuro(preview.comparison.som_total)}
                 tone={preview.comparison.savings > 0 ? 'better' : preview.comparison.savings < 0 ? 'higher' : 'equal'}
               />
@@ -727,7 +743,7 @@ function CompareScreen() {
             </section>
 
             <section className="mini-section">
-              <h3>Detall</h3>
+              <h3>Detall de Som Energia</h3>
               <ul className="totals-list">
                 {preview.breakdown.totals.map((item) => (
                   <li key={item.label} className={item.is_total ? 'total-row' : ''}>
@@ -740,6 +756,7 @@ function CompareScreen() {
           </>
         )}
       </aside>
+      {preview && <EmailComposer key={`${calculationId}-${form.locale}`} report={preview} retailer={retailer} locale={form.locale} stale={!reportIsCurrent || loadingPreview || extractingInvoice} />}
     </div>
   )
 }

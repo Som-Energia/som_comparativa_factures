@@ -97,11 +97,6 @@ def render_report_pdf(report: dict, template_version: str | None = None, locale:
     return HTML(string=html, base_url=template_bundle.assets_dir.as_uri()).write_pdf()
 
 
-def render_report_html(report: dict, template_version: str | None = None, locale: str = "ca", audience: str = "individual") -> str:
-    template_bundle = resolve_comparison_template_bundle(version=template_version)
-    return render_report_html_for_bundle(report, template_bundle, locale=locale, audience=audience)
-
-
 def render_report_html_for_bundle(report: dict, template_bundle, locale: str = "ca", audience: str = "individual") -> str:
     if template_bundle.version == "v3" or audience == "business":
         return _render_reference_simulation_html(report, template_bundle, locale, audience)

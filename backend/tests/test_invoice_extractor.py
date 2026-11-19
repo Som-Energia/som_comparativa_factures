@@ -27,6 +27,8 @@ class ExtractionTests(unittest.TestCase):
         IVA                                                                21 % s/54,00 €                                                              11,34 €
         Impuesto sobre electricidad                                        2,5 % s/54,00 €                                                            1,35 €
         Total a pagar: 54,00 EUR
+        Energía consumida 30,00 €
+        Importe de potencia 10,00 €
         """
         result = extract_from_text(text)
 
@@ -35,6 +37,8 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(result["titular"], "Persona Persona")
         self.assertEqual(result["billing_days"], 30)
         self.assertEqual(result["competitor_invoice_amount"], 54.0)
+        self.assertEqual(result["competitor_energy_eur"], 30.0)
+        self.assertEqual(result["competitor_power_eur"], 10.0)
         self.assertEqual(result["energy_by_periods"], {"P1": 34.41, "P2": 41.55, "P3": 88.63})
         self.assertEqual(result["contracted_power_kw_by_periods"], {"P1": 3.45, "P2": 3.45, "P3": 3.45})
         self.assertEqual(result["meter_rental_eur"], 0.25)
@@ -59,6 +63,20 @@ class ExtractionTests(unittest.TestCase):
         text = "Holaluz\nDistribuidora: IBERDROLA DISTRIBUCIÓN ELÉCTRICA"
 
         self.assertEqual(extract_from_text(text)["retailer"], "Holaluz")
+
+    def test_defers_new_holaluz_component_costs_without_changing_existing_extraction(self):
+        for retailer in ("Holaluz", "Hola Luz"):
+            with self.subTest(retailer=retailer):
+                result = extract_from_text(f"""{retailer}
+Energía 30,00 €
+Potencia 10,00 €
+Total a pagar: 54,00 EUR""")
+                self.assertEqual(result["retailer"], "Holaluz")
+                self.assertEqual(result["competitor_invoice_amount"], 54)
+                self.assertIsNone(result["competitor_energy_eur"])
+                self.assertIsNone(result["competitor_power_eur"])
+                issues = {issue["field"] for issue in result["data_quality"]["issues"]}
+                self.assertTrue({"competitor_energy_eur", "competitor_power_eur"} <= issues)
 
     def test_detects_factor_energia_retailer(self):
         self.assertEqual(

@@ -11,6 +11,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+if __package__:
+    from .invoice_costs import extract_component_costs
+else:  # Support the standalone PDF extraction CLI.
+    from invoice_costs import extract_component_costs
+
 try:
     import fitz
 except ImportError:  # pragma: no cover - exercised by the CLI environment
@@ -84,6 +89,8 @@ def empty_result() -> dict[str, Any]:
         "titular": None,
         "billing_days": None,
         "competitor_invoice_amount": None,
+        "competitor_energy_eur": None,
+        "competitor_power_eur": None,
         "energy_by_periods": {"P1": None, "P2": None, "P3": None},
         "contracted_power_kw_by_periods": {"P1": None, "P2": None, "P3": None},
         "meter_rental_eur": None,
@@ -1062,6 +1069,9 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     billing_days, derived = extract_billing_days(text, words)
     result["billing_days"] = billing_days
     result["competitor_invoice_amount"] = extract_total_amount(text, words)
+    # Holaluz component costs are deferred to the IMP_extractor_hl_en change.
+    if result["retailer"] != "Holaluz":
+        result.update(extract_component_costs(text))
     result["energy_by_periods"] = extract_energy_by_periods(text, words)
     result["contracted_power_kw_by_periods"] = extract_contracted_powers(text, words)
     result["meter_rental_eur"] = extract_meter_rental(text)
@@ -1079,6 +1089,11 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     for period, value in result["energy_by_periods"].items():
         if value is None:
             add_issue(result, f"energy_by_periods.{period}", "missing_or_unverified", "No s'ha pogut extreure el consum en kWh.")
+
+    for kind, label in [("energy", "consum"), ("power", "potència")]:
+        field = f"competitor_{kind}_eur"
+        if result[field] is None:
+            add_issue(result, field, "missing_or_unverified", f"No s'ha pogut verificar l'import de {label} abans d'impostos i amb descomptes. És opcional; cal revisar-lo per proposar el motiu automàtic.")
 
     # Contracted power is implemented progressively for each retailer.
     for period, value in result["contracted_power_kw_by_periods"].items():

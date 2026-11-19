@@ -53,11 +53,14 @@
   --color-page: var(--som-background);
   --color-panel: var(--som-background-two);
   --color-tile: var(--som-white);
+  --color-email-table: var(--som-primary-light);
+  --color-email-tip: var(--som-orange);
 
   /* Text */
   --color-text: var(--som-primary);
   /* El web oficial usa una opacitat del 60%, insuficient per a text petit (AA). */
   --color-text-muted: var(--som-primary-70);
+  --color-link: var(--som-primary-dark);
   --color-error: var(--som-status-alert);
 
   /* Camps de formulari */
