@@ -31,6 +31,7 @@ NAMED_ENERGY_PERIODS = {"punta": "P1", "pla": "P2", "llano": "P2", "vall": "P3",
 NAMED_ENERGY_PERIOD_PATTERN = r"punta|pla|llano|vall|valle"
 ENDESA_ELECTRICITY_TAX_LABEL = r"(?:impuesto\s+electricidad|impost\s+electricitat)"
 ENDESA_METER_RENTAL_LABEL = r"(?:alquiler\s+del\s+contador|lloguer\s+del\s+comptador)"
+EQUIPMENT_RENTAL_LABEL = r"alquiler\s+(?:de\s+)?equipos?(?:\s+(?:de\s+)?medida(?:\s+y\s+control)?)?"
 CATALAN_MONTHS = {
     "gener": 1,
     "febrer": 2,
@@ -82,6 +83,9 @@ RETAILERS = {
     "repsol": "Repsol",
     "factor energia": "Factor Energia",
     "factor energía": "Factor Energia",
+    "plenitude": "Plenitude",
+    "pepeenergy": "Pepeenergy",
+    "pepephone": "Pepeenergy",
 }
 TITULAR_VALUE_EXCLUSIONS = {"POTENCIA"}
 
@@ -377,6 +381,38 @@ def extract_titular(text: str, words: list[tuple[Any, ...]] | None = None) -> st
         if is_titular_value(value):
             return value
 
+    # Pepeenergy puts the name below "Datos cliente", beside the billing column.
+    if words:
+        for label in words:
+            if label[5].casefold() != "datos":
+                continue
+            if not any(
+                word[0] == label[0] and abs(word[2] - label[2]) < 3
+                and label[3] < word[1] < label[3] + 50
+                and word[5].casefold().rstrip(":") == "cliente"
+                for word in words
+            ):
+                continue
+            below = [
+                word for word in words
+                if word[0] == label[0] and label[4] < word[2] < label[4] + 30
+                and label[1] - 2 <= word[1] < label[1] + 240
+            ]
+            if below:
+                first_y = min(word[2] for word in below)
+                value = " ".join(
+                    word[5] for word in sorted(below, key=lambda word: word[1])
+                    if abs(word[2] - first_y) < 3
+                )
+                if is_titular_value(value) and not re.match(r"(?:NIF|NIE|CIF)\b", value, re.IGNORECASE):
+                    return value
+
+    customer = re.search(r"\bdatos[ \t]+cliente[ \t]*:?[^\n]*\n[ \t]*([^\n]+)", text, re.IGNORECASE)
+    if customer:
+        value = re.split(r"\s{2,}", customer.group(1).strip())[0]
+        if is_titular_value(value) and not re.match(r"(?:NIF|NIE|CIF)\b", value, re.IGNORECASE):
+            return value
+
     match = re.search(
         r"(?:^|\n)\s*(?:titular(?:\s+del\s+(?:contrato|suministro|subministrament))?|datos\s+del\s+titular)\s*[:\-]?\s*([^\n]{2,120})",
         text,
@@ -399,6 +435,23 @@ def extract_billing_days(
     )
     if explicit_period:
         return int(explicit_period.group(1)), False
+
+    # Plenitude and Pepeenergy state days in the meter-rental formula, in either order.
+    rental_days = set()
+    for row in re.findall(
+        rf"(?:{EQUIPMENT_RENTAL_LABEL}|alquiler\s+(?:(?:del?|de\s+los)\s+)?contador)\b[^\n]*",
+        text, re.IGNORECASE,
+    ):
+        if not re.search(rf"(?:{NUMBER_PATTERN})\s*(?:€|eur)\s*$", row, re.IGNORECASE):
+            continue
+        days_first = re.search(r"\b(\d{1,3})\s+d[ií]as\s*[x×*]", row, re.IGNORECASE)
+        rate_first = re.search(
+            r"(?:€|eur)\s*/\s*d[ií]a\s*[x×*]\s*(\d{1,3})(?![\d.,])", row, re.IGNORECASE,
+        )
+        if match := days_first or rate_first:
+            rental_days.add(int(match.group(1)))
+    if len(rental_days) == 1 and (days := next(iter(rental_days))) > 0:
+        return days, False
 
     for billing_period, months in (
         (CATALAN_BILLING_PERIOD_PATTERN.search(text), CATALAN_MONTHS),
@@ -578,6 +631,55 @@ def extract_total_amount(text: str, words: list[tuple[Any, ...]] | None = None) 
     return normalize_number(match.group(1)) if match else None
 
 
+def _extract_consumption_table(words: list[tuple[Any, ...]]) -> dict[str, float | None] | None:
+    """Read labeled period rows within the consumption column, not adjacent readings."""
+    for label in words:
+        if not re.fullmatch(r"consum(?:o)?", label[5], re.IGNORECASE):
+            continue
+        header = sorted(
+            (word for word in words if word[0] == label[0] and abs(word[2] - label[2]) < 3),
+            key=lambda word: word[1],
+        )
+        unit = next((word for word in header if word[1] > label[3]
+                     and re.fullmatch(r"\(kwh\)", word[5], re.IGNORECASE)), None)
+        if unit is None:
+            continue
+        previous = max((word[3] for word in header if word[3] < label[1]), default=label[1])
+        following = min((word[1] for word in header if word[1] > unit[3]), default=unit[3])
+        left, right = (previous + label[1]) / 2, (unit[3] + following) / 2
+        bottom = min(
+            (word[2] for word in words if word[0] == label[0] and word[2] > label[4]
+             and word[1] < left and word[5].casefold() == "total"),
+            default=float("inf"),
+        )
+        periods = {}
+        rows = sorted(
+            (word for word in words if word[0] == label[0] and label[4] < word[2] < bottom
+             and word[1] < left and re.fullmatch(r"per[ií]od[oe]", word[5], re.IGNORECASE)),
+            key=lambda word: word[2],
+        )
+        for row in rows:
+            row_words = sorted(
+                (word for word in words if word[0] == row[0] and abs(word[2] - row[2]) < 3),
+                key=lambda word: word[1],
+            )
+            period = next((word[5] for word in row_words
+                           if row[3] < word[1] < left and word[5] in {"1", "2", "3"}), None)
+            if period is None:
+                continue
+            values = [word for word in row_words if left <= (word[1] + word[3]) / 2 <= right
+                      and re.fullmatch(NUMBER_PATTERN, word[5])]
+            key = f"P{period}"
+            if key in periods:
+                break  # Do not mix another table into the same set of periods.
+            periods[key] = normalize_number(values[0][5]) if len(values) == 1 else None
+            if len(periods) == 3:
+                break
+        if periods:
+            return {period: periods.get(period) for period in ("P1", "P2", "P3")}
+    return None
+
+
 def extract_energy_by_periods(
     text: str, words: list[tuple[Any, ...]] | None = None
 ) -> dict[str, float | None]:
@@ -596,7 +698,9 @@ def extract_energy_by_periods(
         return periods
 
     # Holaluz Classic: each row has previous reading, current reading, consumption.
-    if re.search(r"les\s+teves\s+lectures|tus\s+lecturas", text, re.IGNORECASE):
+    if extract_retailer(text, words) == "Holaluz" and re.search(
+        r"les\s+teves\s+lectures|tus\s+lecturas", text, re.IGNORECASE,
+    ):
         if words:
             for label in words:
                 if not re.fullmatch(r"P[123]", label[5], re.IGNORECASE):
@@ -645,6 +749,9 @@ def extract_energy_by_periods(
     if all(value is not None for value in periods.values()):
         return periods
 
+    if words and (table := _extract_consumption_table(words)) is not None:
+        return table
+
     factor_consumptions = re.findall(
         rf"consum(?:o)?\s+\(kwh\)\s*\n\s*({NUMBER_PATTERN})\s*\n\s*({NUMBER_PATTERN})\s*\n\s*({NUMBER_PATTERN})",
         text,
@@ -657,38 +764,6 @@ def extract_energy_by_periods(
             "P2": normalize_number(p2),
             "P3": normalize_number(p3),
         }
-
-    if words:
-        for label in words:
-            if not re.fullmatch(r"consum(?:o)?", label[5], re.IGNORECASE):
-                continue
-            has_kwh = any(
-                word[0] == label[0]
-                and abs(word[2] - label[2]) < 4
-                and word[1] > label[3]
-                and re.fullmatch(r"\(kwh\)", word[5], re.IGNORECASE)
-                for word in words
-            )
-            if not has_kwh:
-                continue
-            values = sorted(
-                (
-                    word
-                    for word in words
-                    if word[0] == label[0]
-                    and word[2] > label[4]
-                    and word[2] < label[4] + 80
-                    and label[1] - 5 <= word[1] <= label[3] + 50
-                    and re.fullmatch(rf"{NUMBER_PATTERN}", word[5])
-                ),
-                key=lambda word: word[2],
-            )
-            if len(values) >= 3:
-                return {
-                    "P1": normalize_number(values[0][5]),
-                    "P2": normalize_number(values[1][5]),
-                    "P3": normalize_number(values[2][5]),
-                }
 
     iberdrola_consumptions = re.search(
         r"sus\s+consumos\s+desagregados\s+han\s+sido\s+"
@@ -988,6 +1063,14 @@ def extract_vat_amount(text: str) -> float | None:
 
 
 def extract_meter_rental(text: str) -> float | None:
+    equipment = re.search(
+        rf"{EQUIPMENT_RENTAL_LABEL}\s*:?\s*(?:\([^\n)]+\)\s*)?"
+        rf"({NUMBER_PATTERN})\s*(?:€|eur\b)(?!\s*/)",
+        text, re.IGNORECASE,
+    )
+    if equipment:
+        return normalize_number(equipment.group(1))
+
     # Endesa: "Alquiler del contador ( N días x N €/día ) ....N,NN €"
     m = re.search(
         rf"{ENDESA_METER_RENTAL_LABEL}\s*\([^)]+\)\s*\.+\s*({AMOUNT_PATTERN[1:-1]})\s*€",
@@ -1058,6 +1141,15 @@ def extract_contracted_powers(
     )
     if contracted:
         return {"P1": normalize_number(contracted.group(1)), "P2": normalize_number(contracted.group(2)), "P3": None}
+
+    # Pepeenergy explicitly names the two 2.0TD contracted-power periods.
+    labeled_powers = re.findall(
+        rf"potencia\s+contratada\s+en\s+(P[12])\s*(?:\([^\n)]+\)\s*)?:\s*({POWER_PATTERN})\s*kw\b",
+        text, re.IGNORECASE,
+    )
+    if labeled_powers:
+        powers.update({period.upper(): normalize_number(value) for period, value in labeled_powers})
+        return powers
 
     # Endesa: "Potencias contratadas: punta-llano N kW; valle N kW"
     endesa_match = re.search(
@@ -1258,8 +1350,8 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     access_tariff = extract_access_tariff(text, words)
     # Contracted power is implemented progressively for each retailer.
     for period, value in result["contracted_power_kw_by_periods"].items():
-        # These Holaluz layouts have two contracted-power periods, not three.
-        if period == "P3" and result["retailer"] == "Holaluz" and access_tariff == "2.0TD" and all(
+        # These layouts explicitly use P1/P2 for 2.0TD, with no third power period.
+        if period == "P3" and result["retailer"] in {"Holaluz", "Plenitude", "Pepeenergy"} and access_tariff == "2.0TD" and all(
             result["contracted_power_kw_by_periods"][key] is not None for key in ("P1", "P2")
         ):
             continue

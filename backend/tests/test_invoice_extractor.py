@@ -223,7 +223,14 @@ Total a pagar: 51,86 €
                 self.assertEqual(result["vat_amount"], 9.0)
                 self.assertEqual(result["vat_rate_percent"], 21.0)
                 self.assertEqual(result["competitor_invoice_amount"], 51.86)
-                self.assertEqual(result["data_quality"], {"status": "verified", "issues": []})
+                self.assertEqual(result["data_quality"]["status"], "needs_review")
+                optional_issues = {"competitor_power_eur"}
+                if consumption == "Consum":
+                    optional_issues.add("competitor_energy_eur")
+                self.assertEqual(
+                    {issue["field"] for issue in result["data_quality"]["issues"]},
+                    optional_issues,
+                )
 
     def test_prefers_explicit_billing_days_over_date_calculation(self):
         for period, days in [("Període de facturació", "dies"), ("Periodo de facturación", "días")]:
