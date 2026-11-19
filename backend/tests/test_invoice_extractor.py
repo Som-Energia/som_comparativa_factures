@@ -64,7 +64,7 @@ class ExtractionTests(unittest.TestCase):
 
         self.assertEqual(extract_from_text(text)["retailer"], "Holaluz")
 
-    def test_defers_new_holaluz_component_costs_without_changing_existing_extraction(self):
+    def test_extracts_holaluz_component_costs_without_changing_existing_extraction(self):
         for retailer in ("Holaluz", "Hola Luz"):
             with self.subTest(retailer=retailer):
                 result = extract_from_text(f"""{retailer}
@@ -73,10 +73,10 @@ Potencia 10,00 €
 Total a pagar: 54,00 EUR""")
                 self.assertEqual(result["retailer"], "Holaluz")
                 self.assertEqual(result["competitor_invoice_amount"], 54)
-                self.assertIsNone(result["competitor_energy_eur"])
-                self.assertIsNone(result["competitor_power_eur"])
+                self.assertEqual(result["competitor_energy_eur"], 30)
+                self.assertEqual(result["competitor_power_eur"], 10)
                 issues = {issue["field"] for issue in result["data_quality"]["issues"]}
-                self.assertTrue({"competitor_energy_eur", "competitor_power_eur"} <= issues)
+                self.assertFalse({"competitor_energy_eur", "competitor_power_eur"} & issues)
 
     def test_detects_factor_energia_retailer(self):
         self.assertEqual(

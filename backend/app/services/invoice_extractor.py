@@ -1326,9 +1326,7 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     billing_days, derived = extract_billing_days(text, words)
     result["billing_days"] = billing_days
     result["competitor_invoice_amount"] = extract_total_amount(text, words)
-    # Holaluz component costs are deferred to the IMP_extractor_hl_en change.
-    if result["retailer"] != "Holaluz":
-        result.update(extract_component_costs(text))
+    result.update(extract_component_costs(text))
     result["energy_by_periods"] = extract_energy_by_periods(text, words)
     result["contracted_power_kw_by_periods"] = extract_contracted_powers(text, words)
     result["meter_rental_eur"] = extract_meter_rental(text)
