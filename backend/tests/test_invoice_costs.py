@@ -129,3 +129,92 @@ Por energía consumida          40,00 €"""
 
 def test_dotted_leader_does_not_hide_a_negative_amount():
     assert all(value is None for value in extract_component_costs('Energía............-30,00 €\nPotencia........-12,00 €').values())
+
+
+def test_holaluz_classic_uses_billed_totals_without_adjustments_or_social_bonus():
+    text = """Holaluz
+Per potència contractada       20,00 €
+Per energia utilitzada         35,00 €
+Potencia [P1] 4 kW 0,10 €/kW i día 12,00 €
+         [P2] 4 kW 0,08 €/kW i día 8,00 €
+Energia 250 kWh 0,14 €/kWh 35,00 €
+Ajust comp. adequació demanda 3,00 €
+Bo social 0,50 €
+Peatge d'accés per potència 9,00 €"""
+    assert extract_component_costs(text) == {"competitor_energy_eur": 35, "competitor_power_eur": 20}
+
+
+def test_holaluz_justa_does_not_invent_a_split_from_a_personalized_fee():
+    assert extract_component_costs("""Holaluz
+Tu tarifa personalizada 60,00 €
+TOTAL TARIFA JUSTA 77,00 €
+Energía en Holaluz 30,00 €
+Potencia 10,00 €""") == {"competitor_energy_eur": None, "competitor_power_eur": None}
+
+
+def test_iberdrola_payment_plan_does_not_hide_explicit_billed_component_costs():
+    text = """Su modalidad de pago es Cuota Fija
+CUOTA FIJA A PAGAR 180,00 €
+Total importe potencia hasta 30/06/2026          12,00 €
+Energía consumida       200,00 kWh x 0,25 €/kWh          50,00 €
+CARGOS NORMATIVOS
+Financiación bono social fijo 0,50 €
+TOTAL ENERGÍA 65,00 €"""
+    assert extract_component_costs(text) == {"competitor_energy_eur": 50, "competitor_power_eur": 12}
+
+
+@pytest.mark.parametrize("adjustment,expected", [("1,50", 40), ("2,50", None)])
+def test_plenitude_separately_billed_adjustment_is_excluded_only_if_reconciled(adjustment, expected):
+    text = f"""Por energía consumida: 41,50 €
+Por potencia contratada: 12,00 €
+Consumo Fácil (01-06-2026 - 30-06-2026): 200,00 kWh * 0,200000 €/kWh 40,00 €
+Ajuste por variación del coste de los peajes y cargos del sistema (01-06-2026 - 30-06-2026) {adjustment} €"""
+    assert extract_component_costs(text) == {"competitor_energy_eur": expected, "competitor_power_eur": 12}
+
+
+@pytest.fixture
+def corrected_invoice():
+    return """Energía XXI
+Por potencia contratada        10,00 €
+Por energía consumida         100,00 €
+TOTAL IMPORTE FACTURA          150,00 €
+Facturación por potencia contratada ("TÉRMINO FIJO") 8,00 €
+Facturación por energía consumida ("TÉRMINO VARIABLE") 80,00 €
+TOTAL IMPORTE FACTURA 120,00 €
+Facturación por potencia contratada ("TÉRMINO FIJO") -2,00 €
+Facturación por energía consumida ("TÉRMINO VARIABLE") -20,00 €
+TOTAL IMPORTE FACTURA -30,00 €
+Por potencia contratada 2,00 €
+Por energía consumida 20,00 €
+TOTAL IMPORTE PERIODO 30,00 €
+Facturación por potencia contratada ("TÉRMINO FIJO") 4,00 €
+Facturación por energía consumida ("TÉRMINO VARIABLE") 40,00 €
+TOTAL IMPORTE FACTURA 60,00 €"""
+
+
+def test_reconciles_corrective_components_against_global_summary(corrected_invoice):
+    assert extract_component_costs(corrected_invoice) == {"competitor_energy_eur": 100, "competitor_power_eur": 10}
+
+
+@pytest.mark.parametrize("old,new", [
+    ('VARIABLE") -20,00', 'VARIABLE") -21,00'),
+    ('FIJO") 4,00', 'FIJO") 5,00'),
+    ('FACTURA 60,00', 'FACTURA 61,00'),
+])
+def test_inconsistent_corrective_documents_require_review(corrected_invoice, old, new):
+    assert extract_component_costs(corrected_invoice.replace(old, new)) == {"competitor_energy_eur": None, "competitor_power_eur": None}
+
+
+def test_corrective_documents_without_global_total_or_with_repeated_bundle_need_review(corrected_invoice):
+    for text in (corrected_invoice.replace("TOTAL IMPORTE FACTURA          150,00 €", ""), corrected_invoice * 2):
+        assert extract_component_costs(text) == {"competitor_energy_eur": None, "competitor_power_eur": None}
+
+
+def test_endesa_nested_hour_discounts_do_not_justify_unallocated_promotional_discount():
+    text = """Energía 45,00 €
+Potencia 15,00 €
+Consumo en horas promocionadas 100 kWh x 0,30 Eur/kWh 30,00 €
+Consumo en resto de horas 100 kWh x 0,20 Eur/kWh 20,00 €
+Descuento horas de mayor consumo 10,00 Eur x -50 % -5,00 €
+Descuento fidelidad 32,00 Eur x -10 % -3,20 €"""
+    assert extract_component_costs(text) == {"competitor_energy_eur": None, "competitor_power_eur": None}
