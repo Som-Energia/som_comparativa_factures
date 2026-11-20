@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import EmailComposer from './EmailComposer'
+import logoUrl from '@somenergia/brand/logos/logo.svg'
 
 const apiBaseUrl = '/api'
 const appVersion = __APP_VERSION__
@@ -66,9 +67,9 @@ function App() {
   return (
     <main className="page-shell">
       <section className="hero-card">
-        <img className="brand-logo" src="/logo.svg" alt="Som Energia" />
+        <img className="brand-logo" src={logoUrl} alt="Som Energia" />
         <p className="eyebrow">MVP comparativa · {appVersion}</p>
-        <h1>Simulacio de factura Som Energia</h1>
+        <h1>Simulacio de factura</h1>
         <p className="hero-copy">
           Calcula comparatives i gestiona versions de plantilla PDF sense exposar el shell tècnic.
         </p>
