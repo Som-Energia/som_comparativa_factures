@@ -79,6 +79,7 @@ SPANISH_BILLING_PERIOD_PATTERN = re.compile(
     re.IGNORECASE,
 )
 RETAILERS = {
+    "octopus": "Octopus Energy",
     "energía xxi": "Energía XXI",
     "energia xxi": "Energía XXI",
     "iberdrola": "Iberdrola",
@@ -1316,6 +1317,93 @@ def extract_access_tariff(text: str, words: list[tuple[Any, ...]] | None = None)
     return match.group(0).upper().replace("20TD", "2.0TD") if match else None
 
 
+def _extract_octopus_fields(text: str, result: dict[str, Any]) -> None:
+    """Read Octopus's billed rows without confusing their regulatory breakdowns."""
+    def unique_amount(label: str) -> float | None:
+        amounts = {
+            normalize_number(match.group(1))
+            for match in re.finditer(
+                rf"^\s*{label}\s*:?\s*({NUMBER_PATTERN})\s*(?:€|EUR)\s*$",
+                text, re.IGNORECASE | re.MULTILINE,
+            )
+        }
+        return next(iter(amounts)) if len(amounts) == 1 else None
+
+    holder = re.search(r"^\s*Cliente:[ \t]*([^\n]+)", text, re.IGNORECASE | re.MULTILINE)
+    if holder:
+        value = re.split(r"\s{2,}|\s+CUPS\s*:", holder.group(1), maxsplit=1)[0].strip()
+        if is_titular_value(value):
+            result["titular"] = value
+
+    # Each main row is followed by tolls, charges and margin: read only named rows.
+    energy = {"P1": None, "P2": None, "P3": None}
+    for name, period in (("Punta", "P1"), ("Llano", "P2"), ("Valle", "P3")):
+        values = {
+            normalize_number(match.group(1)) for match in re.finditer(
+                rf"^\s*{name}\s+({NUMBER_PATTERN})\s+kWh\s+"
+                rf"(?:{POWER_PATTERN})\s*(?:€|EUR)/\s*kWh\s+(?:{NUMBER_PATTERN})\s*(?:€|EUR)\s*$",
+                text, re.IGNORECASE | re.MULTILINE,
+            )
+        }
+        if len(values) == 1:
+            energy[period] = next(iter(values))
+    result["energy_by_periods"] = energy
+
+    # 2.0TD has two power periods, even though the meter table prints six columns.
+    powers = {"P1": None, "P2": None, "P3": None}
+    contracted = re.search(
+        rf"\bPotencia\s+Contratada\s*\(kW\)\s+({POWER_PATTERN})\s+({POWER_PATTERN})\b",
+        text, re.IGNORECASE,
+    )
+    if contracted and extract_access_tariff(text) == "2.0TD":
+        powers.update(P1=normalize_number(contracted.group(1)), P2=normalize_number(contracted.group(2)))
+    result["contracted_power_kw_by_periods"] = powers
+
+    billed_days = {int(value) for value in re.findall(
+        rf"^\s*(?:Punta|Valle)\s+(?:{POWER_PATTERN})\s+kW\s*\*\s*(\d{{1,3}})\s+días\b",
+        text, re.IGNORECASE | re.MULTILINE,
+    )}
+    rental_rows = list(re.finditer(
+        rf"^\s*Alquiler\s+de\s+Equipos\s+(\d{{1,3}})\s+días\s+"
+        rf"(?:{POWER_PATTERN})\s*(?:€|EUR)/días?\s+({NUMBER_PATTERN})\s*(?:€|EUR)\s*$",
+        text, re.IGNORECASE | re.MULTILINE,
+    ))
+    billed_days.update(int(row.group(1)) for row in rental_rows)
+    if billed_days:
+        days = next(iter(billed_days)) if len(billed_days) == 1 and min(billed_days) > 0 else None
+        if days != result["billing_days"]:
+            add_issue(result, "billing_days", "billing_days_mismatch",
+                      "Els dies del detall facturat no coincideixen amb la capçalera. Es prioritza el detall si és coherent; cal revisar-los.")
+        result["billing_days"] = days
+    rental_amounts = {normalize_number(row.group(2)) for row in rental_rows}
+    if rental_rows:
+        result["meter_rental_eur"] = next(iter(rental_amounts)) if len(rental_amounts) == 1 else None
+
+    result["competitor_energy_eur"] = unique_amount(r"Energía\s+Activa")
+    result["competitor_power_eur"] = unique_amount(r"Potencia")
+    # Credit is a payment balance, not a reduction of this invoice's supply cost.
+    result["competitor_invoice_amount"] = unique_amount(r"Total\s+factura")
+    if re.search(r"Crédito\s+usado\s*:?\s*-\s*[\d.,]+\s*(?:€|EUR)", text, re.IGNORECASE):
+        add_issue(result, "competitor_invoice_amount", "credit_excluded",
+                  "S'utilitza el total de la factura abans d'aplicar el crèdit acumulat, no el total a pagar.")
+
+    tax = re.search(
+        rf"^\s*Impuesto\s+Eléctrico\s*\(REDUCIDO\)\s+(?:{NUMBER_PATTERN})\s+kWh\s+"
+        rf"(?:{POWER_PATTERN})\s*(?:€|EUR)/kWh\s+({NUMBER_PATTERN})\s*(?:€|EUR)\s*$",
+        text, re.IGNORECASE | re.MULTILINE,
+    )
+    if tax:
+        result["electricity_tax"] = normalize_number(tax.group(1))
+        add_issue(result, "electric_tax_rate_percent", "minimum_electricity_tax",
+                  "La factura aplica un mínim d'impost elèctric per kWh. El percentatge anunciat, per si sol, no reprodueix l'import facturat; cal revisar la simulació.")
+    rate = re.search(
+        r"tipo\s+impositivo\s+del\s+IEE\s+queda\s+reducido\s+al\s+(\d+(?:[.,]\d+)?)\s*%",
+        text, re.IGNORECASE,
+    )
+    if rate:
+        result["electric_tax_rate_percent"] = normalize_number(rate.group(1))
+
+
 def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> dict[str, Any]:
     """Apply deterministic extraction rules to native PDF text."""
     result = empty_result()
@@ -1336,6 +1424,8 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     result["electricity_tax"] = extract_electricity_tax(text)
     result["electric_tax_rate_percent"] = extract_electricity_tax_rate(text)
     result["self_consumption_surplus_kwh"] = extract_surplus_kwh(text)
+    if result["retailer"] == "Octopus Energy":
+        _extract_octopus_fields(text, result)
     if result["self_consumption_surplus_kwh"] is None and re.search(SURPLUS_LABEL_PATTERN, text, re.IGNORECASE):
         add_issue(
             result, "self_consumption_surplus_kwh", "missing_or_unverified",
@@ -1377,7 +1467,7 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     # Contracted power is implemented progressively for each retailer.
     for period, value in result["contracted_power_kw_by_periods"].items():
         # These layouts explicitly use P1/P2 for 2.0TD, with no third power period.
-        if period == "P3" and result["retailer"] in {"Holaluz", "Plenitude", "Pepeenergy"} and access_tariff == "2.0TD" and all(
+        if period == "P3" and result["retailer"] in {"Holaluz", "Plenitude", "Pepeenergy", "Octopus Energy"} and access_tariff == "2.0TD" and all(
             result["contracted_power_kw_by_periods"][key] is not None for key in ("P1", "P2")
         ):
             continue
