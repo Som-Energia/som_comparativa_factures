@@ -688,16 +688,35 @@ Vall 3.000,000 3.063,625 1,00 0,000 63,625
         )
 
     def test_extracts_iberdrola_declared_consumption_by_period(self):
-        text = """
+        for llano in ("41", "41,5", "41,50", "41,500"):
+            with self.subTest(llano=llano):
+                text = f"""
         Las lecturas desagregadas tomadas el 31/08/2025 son: punta: 1.697 kWh;
         llano: 1.896 kWh; valle 4.289 kWh. Sus consumos desagregados han sido
-        punta: 39 kWh; llano: 41 kWh; valle 75 kWh.
+        punta: 39 kWh; llano: {llano} kWh; valle 75 kWh.
         """
 
-        self.assertEqual(
-            extract_energy_by_periods(text),
-            {"P1": 39.0, "P2": 41.0, "P3": 75.0},
-        )
+                self.assertEqual(
+                    extract_energy_by_periods(text),
+                    {"P1": 39.0, "P2": 41.0 if llano == "41" else 41.5, "P3": 75.0},
+                )
+
+    def test_power_billing_rows_do_not_supply_consumption(self):
+        lines = [
+            "Punta 4,40 kW x 31 días x 0,110 €/kW día 15,06 €",
+            "Valle 4,40 kW x 31 días x 0,014 €/kW día 1,95 €",
+        ]
+        words = [
+            (0, column * 40, row * 20, column * 40 + 30, row * 20 + 8, token)
+            for row, line in enumerate(lines)
+            for column, token in enumerate(line.split())
+        ]
+        for layout in (None, words):
+            with self.subTest(layout=layout is not None):
+                self.assertEqual(
+                    extract_energy_by_periods("\n".join(lines), layout),
+                    {"P1": None, "P2": None, "P3": None},
+                )
 
     def test_extracts_repsol_detailed_energy_by_period(self):
         text = """

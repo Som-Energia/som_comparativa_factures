@@ -30,6 +30,7 @@ CUPS_PATTERN = re.compile(
     r"(?:[\s-]*[0-9][\s-]*[A-Z])?(?![A-Z0-9])", re.IGNORECASE,
 )
 NUMBER_PATTERN = r"\d{1,3}(?:\.\d{3})*,\d{2,3}|\d+(?:[.,]\d{2,3})?"
+ENERGY_NUMBER_PATTERN = r"\d{1,3}(?:\.\d{3})*,\d{1,3}|\d+(?:[.,]\d{1,3})?"
 POWER_PATTERN = r"\d{1,3}(?:\.\d{3})*,\d+|\d+(?:[.,]\d+)?"
 AMOUNT_PATTERN = rf"({NUMBER_PATTERN})"
 DATE_PATTERN = r"(\d{2}/\d{2}/\d{4})"
@@ -808,9 +809,9 @@ def extract_energy_by_periods(
 
     iberdrola_consumptions = re.search(
         r"sus\s+consumos\s+desagregados\s+han\s+sido\s+"
-        r"punta\s*:\s*" + AMOUNT_PATTERN + r"\s*kwh\s*;\s*"
-        r"llano\s*:\s*" + AMOUNT_PATTERN + r"\s*kwh\s*;\s*"
-        r"valle\s*:?\s*" + AMOUNT_PATTERN + r"\s*kwh\b",
+        rf"punta\s*:\s*({ENERGY_NUMBER_PATTERN})\s*kwh\s*;\s*"
+        rf"llano\s*:\s*({ENERGY_NUMBER_PATTERN})\s*kwh\s*;\s*"
+        rf"valle\s*:?\s*({ENERGY_NUMBER_PATTERN})\s*kwh\b",
         text,
         re.IGNORECASE,
     )
@@ -853,6 +854,9 @@ def extract_energy_by_periods(
         period_match = re.match(rf"\s*({NAMED_ENERGY_PERIOD_PATTERN})\b", line, re.IGNORECASE)
         if not period_match:
             continue
+        # A period name also labels billed power; its prices are not kWh.
+        if re.search(r"\bkw\b|€|\beur(?:os?)?\b", line, re.IGNORECASE):
+            continue
         values = re.findall(rf"-?{NUMBER_PATTERN}", line)
         if len(values) >= 5:
             periods[NAMED_ENERGY_PERIODS[period_match.group(1).casefold()]] = normalize_number(
@@ -877,13 +881,20 @@ def extract_energy_by_periods(
             period = NAMED_ENERGY_PERIODS.get(label[5].lower().rstrip(":"))
             if period is None:
                 continue
+            row = [
+                word for word in words
+                if word[0] == label[0] and abs(word[2] - label[2]) < 4
+            ]
+            if re.search(
+                r"\bkw\b|€|\beur(?:os?)?\b",
+                " ".join(word[5] for word in row), re.IGNORECASE,
+            ):
+                continue
             readings = sorted(
                 (
                     word
-                    for word in words
-                    if word[0] == label[0]
-                    and abs(word[2] - label[2]) < 4
-                    and re.fullmatch(rf"-?{NUMBER_PATTERN}", word[5])
+                    for word in row
+                    if re.fullmatch(rf"-?{NUMBER_PATTERN}", word[5])
                 ),
                 key=lambda word: word[1],
             )
