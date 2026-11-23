@@ -20,7 +20,7 @@ def report_adjustment_prices(reference_pricing, tmp_path):
 
 def _payload():
     return {
-        "cups": "ES0210002100000000ZN0F",
+        "cups": "ES0210002100000000RN0F",
         "titular": "Persona de prova",
         "billing_days": 30,
         "competitor_invoice_amount": 54.0,
@@ -48,7 +48,7 @@ def test_reference_template_pdf_preserves_static_pages_and_renders_calculation_p
     calculation_page = document[2]
     calculation_text = calculation_page.get_text()
     assert "Persona de prova" in calculation_text
-    assert "ES0210002100000000ZN0F" in calculation_text
+    assert "ES0210002100000000RN0F" in calculation_text
     assert "Cost per l'energia utilitzada" in calculation_text
     assert "3,29 €" in calculation_text
     assert "Sols (€) acumulats al Flux Solar" in calculation_text

@@ -298,7 +298,7 @@ def test_compare_allows_tariffs_without_surplus_compensation():
         "adjustment_service_prices_eur_per_kwh": {"P1": 0, "P2": 0, "P3": 0},
     }
     payload = {
-        "cups": "ES0210002100000000ZN0F",
+        "cups": "ES0210002100000000RN0F",
         "titular": "Persona Persona",
         "billing_days": 1,
         "competitor_invoice_amount": 0,

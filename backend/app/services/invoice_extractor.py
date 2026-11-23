@@ -13,8 +13,10 @@ from pathlib import Path
 from typing import Any
 
 if __package__:
+    from .cups import is_valid_cups, normalize_cups
     from .invoice_costs import extract_component_costs
 else:  # Support the standalone PDF extraction CLI.
+    from cups import is_valid_cups, normalize_cups
     from invoice_costs import extract_component_costs
 
 try:
@@ -23,7 +25,10 @@ except ImportError:  # pragma: no cover - exercised by the CLI environment
     fitz = None
 
 
-CUPS_PATTERN = re.compile(r"\bES(?:\s*\d){16}(?:\s*[A-Z0-9]){2,4}\b", re.IGNORECASE)
+CUPS_PATTERN = re.compile(
+    r"(?<![A-Z0-9])ES(?:[\s-]*[0-9]){16}[\s-]*[A-Z]{2}"
+    r"(?:[\s-]*[0-9][\s-]*[A-Z])?(?![A-Z0-9])", re.IGNORECASE,
+)
 NUMBER_PATTERN = r"\d{1,3}(?:\.\d{3})*,\d{2,3}|\d+(?:[.,]\d{2,3})?"
 POWER_PATTERN = r"\d{1,3}(?:\.\d{3})*,\d+|\d+(?:[.,]\d+)?"
 AMOUNT_PATTERN = rf"({NUMBER_PATTERN})"
@@ -164,30 +169,59 @@ def extract_retailer(text: str, words: list[tuple[Any, ...]] | None = None) -> s
 
 
 def extract_cups(text: str, words: list[tuple[Any, ...]] | None = None) -> str | None:
+    def candidates(fragment: str) -> set[str]:
+        return {
+            normalize_cups(match.group(0)) for match in CUPS_PATTERN.finditer(fragment)
+            if is_valid_cups(match.group(0))
+        }
+
+    def unique(values: set[str]) -> str | None:
+        return next(iter(values)) if len(values) == 1 else None
+
+    # Reconstruct the whole value row before considering the line below it.
+    # A fragmented CUPS must not lose precedence to the nearby bank details.
     if words:
-        for label in words:
-            if "CUPS" not in label[5].upper():
-                continue
-            for candidate in words:
-                if (
-                    candidate[0] == label[0]
-                    and abs(candidate[2] - label[2]) < 4
-                    and candidate[1] > label[3]
-                    and CUPS_PATTERN.fullmatch(candidate[5])
-                ):
-                    return re.sub(r"\s+", "", candidate[5]).upper()
-            below = " ".join(
-                word[5] for word in sorted(words, key=lambda word: (word[2], word[1]))
+        labels = [word for word in words if re.search(r"\bCUPS\b", word[5], re.IGNORECASE)]
+        values = set()
+        for label in labels:
+            row = " ".join(
+                word[5] for word in sorted(words, key=lambda word: word[1])
+                if word[0] == label[0] and abs(word[2] - label[2]) < 4
+                and word[1] >= label[1]
+            )
+            values.update(candidates(row))
+        if values:
+            return unique(values)
+
+        for label in labels:
+            below = [
+                word for word in words
                 if word[0] == label[0] and label[4] < word[2] < label[4] + 25
                 and label[1] - 2 <= word[1] < label[1] + 180
-            )
-            match = CUPS_PATTERN.search(below)
-            if match:
-                return re.sub(r"\s+", "", match.group(0)).upper()
+            ]
+            if below:
+                first_y = min(word[2] for word in below)
+                values.update(candidates(" ".join(
+                    word[5] for word in sorted(below, key=lambda word: word[1])
+                    if abs(word[2] - first_y) < 3
+                )))
+        if values:
+            return unique(values)
 
-    labeled = re.search(r"\bCUPS\b.{0,100}?" + CUPS_PATTERN.pattern, text, re.IGNORECASE | re.DOTALL)
-    match = CUPS_PATTERN.search(labeled.group(0) if labeled else text)
-    return re.sub(r"\s+", "", match.group(0)).upper() if match else None
+    # Text fallback is confined to the label's row and its immediate value row.
+    labeled_values = set()
+    labels_found = False
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if label := re.search(r"\bCUPS\b", line, re.IGNORECASE):
+            labels_found = True
+            labeled_values.update(candidates(line[label.end():]))
+            following = next((row for row in lines[index + 1:] if row.strip()), "")
+            if following.lstrip().upper().startswith("ES"):
+                labeled_values.update(candidates(following))
+    if labels_found or (words and labels):
+        return unique(labeled_values)
+    return unique(candidates(text))
 
 
 def extract_titular(text: str, words: list[tuple[Any, ...]] | None = None) -> str | None:
@@ -1452,7 +1486,11 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
 
     for field in ("retailer", "cups", "titular", "billing_days", "competitor_invoice_amount"):
         if result[field] is None:
-            add_issue(result, field, "missing_or_unverified", "No s'ha pogut extreure i validar el camp.")
+            message = (
+                "No s'ha pogut identificar un CUPS únic amb format i lletres de control vàlids. Cal revisar-lo."
+                if field == "cups" else "No s'ha pogut extreure i validar el camp."
+            )
+            add_issue(result, field, "missing_or_unverified", message)
 
     for period, value in result["energy_by_periods"].items():
         if value is None:

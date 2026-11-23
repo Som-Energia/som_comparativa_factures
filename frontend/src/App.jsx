@@ -657,7 +657,7 @@ function CompareScreen() {
                   spellCheck="false"
                   value={rawJson}
                   onChange={(event) => setRawJson(event.target.value)}
-                  placeholder={'{\n  "cups": "ES0210002100000000ZN0F",\n  "titular": "Persona Persona"\n}'}
+                  placeholder={'{\n  "cups": "ES0210002100000000RN0F",\n  "titular": "Persona Persona"\n}'}
                 />
                 <FieldError error={errors.raw_json} />
               </label>

@@ -21,7 +21,7 @@ Equipos: 0,91 €
 Total factura 115,38 €
 Crédito usado: -61,11 €
 Datos del Contrato:                       Datos del Punto de Suministro:
-Cliente: Persona Sintética Ejemplo        CUPS: ES0210002100000000ZN0F
+Cliente: Persona Sintética Ejemplo        CUPS: ES0210002100000000RN0F
 NIF: 00000000X                            Tarifa Acceso: 2.0TD
 Distribuidora: I-DE Redes Eléctricas
 Potencia 23,22 €
@@ -57,7 +57,7 @@ def test_octopus_extracts_billed_values_and_explicit_review_reasons(octopus_text
     result = extract_from_text(octopus_text)
     assert result["retailer"] == "Octopus Energy"
     assert result["titular"] == "Persona Sintética Ejemplo"
-    assert result["cups"] == "ES0210002100000000ZN0F"
+    assert result["cups"] == "ES0210002100000000RN0F"
     assert result["billing_days"] == 34
     assert result["competitor_invoice_amount"] == 115.38
     assert result["competitor_energy_eur"] == 79.45

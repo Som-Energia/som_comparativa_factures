@@ -15,7 +15,7 @@ class ExtractionTests(unittest.TestCase):
         text = """
         IBERDROLA CLIENTES, S.A.U.
         Titular del contrato: Persona Persona
-        CUPS: ES0000000000000000TEST
+        CUPS: ES1234123456789012JY1F
         Días facturados: 30
         Energía consumida (kWh)
         P1 34,41 kWh
@@ -33,7 +33,7 @@ class ExtractionTests(unittest.TestCase):
         result = extract_from_text(text)
 
         self.assertEqual(result["retailer"], "Iberdrola")
-        self.assertEqual(result["cups"], "ES0000000000000000TEST")
+        self.assertEqual(result["cups"], "ES1234123456789012JY1F")
         self.assertEqual(result["titular"], "Persona Persona")
         self.assertEqual(result["billing_days"], 30)
         self.assertEqual(result["competitor_invoice_amount"], 54.0)
@@ -85,7 +85,7 @@ Total a pagar: 54,00 EUR""")
         )
 
     def test_extracts_factor_energia_holder_from_apellidos_nombre(self):
-        text = "Titular: ARAGON VERNET, CARLOS\nCUPS: ES0000000000000000TEST"
+        text = "Titular: ARAGON VERNET, CARLOS\nCUPS: ES1234123456789012JY1F"
 
         self.assertEqual(extract_from_text(text)["titular"], "Carlos Aragon Vernet")
 
@@ -110,20 +110,20 @@ Total a pagar: 54,00 EUR""")
 
     def test_normalizes_a_cups_written_with_spaces(self):
         result = extract_from_text(
-            "Identificación punto de suministro (CUPS): ES 0000 0000 0000 0000 TEST"
+            "Identificación punto de suministro (CUPS): ES 1234 1234 5678 9012 JY 1F"
         )
 
-        self.assertEqual(result["cups"], "ES0000000000000000TEST")
+        self.assertEqual(result["cups"], "ES1234123456789012JY1F")
 
     def test_uses_layout_for_a_cups_on_the_same_row_as_its_label(self):
         words = [
             (0, 200, 329, 230, 337, "(CUPS):", 0, 0, 0),
-            (0, 236, 329, 360, 337, "ES0000000000000000TEST", 0, 0, 1),
+            (0, 236, 329, 360, 337, "ES1234123456789012JY1F", 0, 0, 1),
         ]
 
         result = extract_from_text("(CUPS):", words)
 
-        self.assertEqual(result["cups"], "ES0000000000000000TEST")
+        self.assertEqual(result["cups"], "ES1234123456789012JY1F")
 
     def test_uses_layout_to_read_titular_instead_of_the_next_text_line(self):
         words = [
@@ -199,7 +199,7 @@ Total a pagar: 54,00 EUR""")
             with self.subTest(language=period):
                 text = f"""
 Endesa Energía
-{holder}: Persona Sintètica Exemple  CUPS: ES0000000000000000TEST
+{holder}: Persona Sintètica Exemple  CUPS: ES1234123456789012JY1F
 {period}: del 01/04/2026 a 01/05/2026 (30 {days})
 {powers}: {peak_power} 3,450 kW; {valley_power} 4,600 kW
 {consumption} Punta 21,125 kWh x 0,160000 Eur/kWh ........3,38 €
@@ -213,7 +213,7 @@ Total a pagar: 51,86 €
                 result = extract_from_text(text)
 
                 self.assertEqual(result["titular"], "Persona Sintètica Exemple")
-                self.assertEqual(result["cups"], "ES0000000000000000TEST")
+                self.assertEqual(result["cups"], "ES1234123456789012JY1F")
                 self.assertEqual(result["billing_days"], 30)
                 self.assertEqual(result["energy_by_periods"], {"P1": 21.125, "P2": 35.25, "P3": 63.625})
                 self.assertEqual(result["contracted_power_kw_by_periods"], {"P1": 3.45, "P2": 3.45, "P3": 4.6})

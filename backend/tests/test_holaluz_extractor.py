@@ -23,7 +23,7 @@ SEGON
 NIF:
 00000000T
 CUPS:
-ES0000000000000000AA
+ES0000000000000000TT
 Tarifa d'accés: 20TD
 Potència contractada:
 P1 5,50 kW P2 4,40 kW
@@ -57,7 +57,7 @@ PERSONA EJEMPLO
 NIF:
 00000000T
 CUPS:
-ES0000000000000000BB
+ES0000000000000001TR
 Tarifa acceso: 20TD
 Potencia contratada:
 P1 3,50 kW P2 3,50 kW
@@ -79,7 +79,7 @@ def test_classic_extracts_consumption_instead_of_readings(classic_text):
     result = extract_from_text(classic_text)
     assert result["billing_days"] == 31
     assert result["titular"] == "PERSONA EXEMPLE PRIMER- SEGON"
-    assert result["cups"] == "ES0000000000000000AA"
+    assert result["cups"] == "ES0000000000000000TT"
     assert result["energy_by_periods"] == {"P1": 80, "P2": 60, "P3": 220}
     assert result["contracted_power_kw_by_periods"] == {"P1": 5.5, "P2": 4.4, "P3": None}
     assert result["competitor_invoice_amount"] == 102.84
@@ -96,7 +96,7 @@ def test_justa_extracts_estimates_and_warns(justa_text):
     result = extract_from_text(justa_text)
     assert result["billing_days"] == 31
     assert result["titular"] == "PERSONA EJEMPLO"
-    assert result["cups"] == "ES0000000000000000BB"
+    assert result["cups"] == "ES0000000000000001TR"
     assert result["energy_by_periods"] == {"P1": 35, "P2": 25, "P3": 60}
     assert result["contracted_power_kw_by_periods"] == {"P1": 3.5, "P2": 3.5, "P3": None}
     assert result["competitor_invoice_amount"] == 77.4
@@ -185,7 +185,7 @@ def test_digital_pdf_with_two_columns(justa):
             page.insert_text((30, 78), "SEGUNDO", fontsize=9)
             page.insert_text((30, 98), "NIF:", fontsize=9)
             page.insert_text((30, 125), "CUPS:", fontsize=9)
-            page.insert_text((30, 140), "ES0000000000000000AA", fontsize=9)
+            page.insert_text((30, 140), "ES0000000000000000TT", fontsize=9)
             page.insert_text((30, 170), "Potencia contratada:", fontsize=9)
             page.insert_text((30, 185), "P1 3,50 kW P2 3,50 kW", fontsize=9)
             page.insert_text((240, 64), "Desglose de tu factura", fontsize=9)
@@ -205,7 +205,7 @@ def test_digital_pdf_with_two_columns(justa):
                 page.insert_text((30, 80), "Consumo en Valle: 60 kWh. Total: 120 kWh.", fontsize=9)
             document.save(path)
         result = extract_pdf(path)
-    assert result["cups"] == "ES0000000000000000AA"
+    assert result["cups"] == "ES0000000000000000TT"
     assert result["titular"] == "PERSONA EJEMPLO PRIMER- SEGUNDO"
     assert result["billing_days"] == 31
     assert result["energy_by_periods"] == {"P1": 35, "P2": 25, "P3": 60}
