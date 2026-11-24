@@ -1204,6 +1204,15 @@ def extract_contracted_powers(
     text: str, words: list[tuple[Any, ...]] | None = None
 ) -> dict[str, float | None]:
     powers: dict[str, float | None] = {"P1": None, "P2": None, "P3": None}
+    is_20td = extract_access_tariff(text, words) == "2.0TD"
+
+    def named_powers(punta: str, valle: str) -> dict[str, float | None]:
+        peak, valley = normalize_number(punta), normalize_number(valle)
+        if is_20td:
+            return {"P1": peak, "P2": valley, "P3": None}
+        # Keep the existing mapping outside an identified 2.0TD tariff.
+        return {"P1": peak, "P2": peak, "P3": valley}
+
     contracted = re.search(
         rf"pot[eè]ncia\s+contractada\s*:\s*P1\s*:?\s*({POWER_PATTERN})\s*kw\s+P2\s*:?\s*({POWER_PATTERN})\s*kw",
         text, re.IGNORECASE,
@@ -1229,9 +1238,7 @@ def extract_contracted_powers(
         re.IGNORECASE,
     )
     if endesa_match:
-        p1p2 = normalize_number(endesa_match.group(1))
-        p3 = normalize_number(endesa_match.group(2))
-        return {"P1": p1p2, "P2": p1p2, "P3": p3}
+        return named_powers(endesa_match.group(1), endesa_match.group(2))
 
     # Energía XXI: "Potencia contratada en punta-llano: N kW  Potencia contratada en valle: N kW"
     e21_match = re.search(
@@ -1241,17 +1248,17 @@ def extract_contracted_powers(
         re.IGNORECASE,
     )
     if e21_match:
-        p1p2 = normalize_number(e21_match.group(1))
-        p3 = normalize_number(e21_match.group(2))
-        return {"P1": p1p2, "P2": p1p2, "P3": p3}
+        return named_powers(e21_match.group(1), e21_match.group(2))
 
     # Iberdrola: "Potencia punta: N kW" ... "Potencia valle: N,NN kW"
     ib_punta = re.search(rf"potencia\s+punta\s*:\s*({POWER_PATTERN})\s*kw\b", text, re.IGNORECASE)
     ib_valle = re.search(rf"potencia\s+valle\s*:\s*({POWER_PATTERN})\s*kw\b", text, re.IGNORECASE)
     if ib_punta and ib_valle:
-        p1p2 = normalize_number(ib_punta.group(1))
-        p3 = normalize_number(ib_valle.group(1))
-        return {"P1": p1p2, "P2": p1p2, "P3": p3}
+        return {
+            "P1": normalize_number(ib_punta.group(1)),
+            "P2": normalize_number(ib_valle.group(1)),
+            "P3": None,
+        }
 
     # Naturgy: "Potencia contratada P1: N kW" + "Potencia contratada P2: N kW"
     naturgy_powers = re.findall(
@@ -1262,6 +1269,8 @@ def extract_contracted_powers(
     if naturgy_powers:
         for label, value in naturgy_powers:
             powers[label.upper()] = normalize_number(value)
+        if is_20td:
+            return {"P1": powers["P1"], "P2": powers["P2"], "P3": None}
         if powers["P1"] is not None and powers["P3"] is None:
             powers["P3"] = powers["P1"]
         if powers["P2"] is None and powers["P1"] is not None:
@@ -1276,17 +1285,13 @@ def extract_contracted_powers(
         re.IGNORECASE,
     )
     if repsol_match:
-        p1p2 = normalize_number(repsol_match.group(1))
-        p3 = normalize_number(repsol_match.group(2))
-        return {"P1": p1p2, "P2": p1p2, "P3": p3}
+        return named_powers(repsol_match.group(1), repsol_match.group(2))
 
     # Repsol (layout): "Punta: N,NkW" i "Vall/Valle: N,NkW" en línies separades
     repsol_punta = re.search(rf"punta\s*:\s*({POWER_PATTERN})\s*kw\b", text, re.IGNORECASE)
     repsol_vall = re.search(rf"val(?:l|le)\s*:\s*({POWER_PATTERN})\s*kw\b", text, re.IGNORECASE)
     if repsol_punta and repsol_vall:
-        p1p2 = normalize_number(repsol_punta.group(1))
-        p3 = normalize_number(repsol_vall.group(1))
-        return {"P1": p1p2, "P2": p1p2, "P3": p3}
+        return named_powers(repsol_punta.group(1), repsol_vall.group(1))
 
     # Factor Energia: capçalera "P." + "Contractada" en tokens consecutius (prioritat sobre Holaluz)
     if words:
@@ -1317,7 +1322,7 @@ def extract_contracted_powers(
                 return {
                     "P1": normalize_number(values[0][5]),
                     "P2": normalize_number(values[1][5]),
-                    "P3": normalize_number(values[1][5]),
+                    "P3": None if is_20td else normalize_number(values[1][5]),
                 }
 
     # Holaluz: "P1: N,NN kW  P2: N,NN kW" o "P1 N,NN kW  P2 N,NN kW"
@@ -1329,6 +1334,8 @@ def extract_contracted_powers(
     if holaluz_powers:
         for label, value in holaluz_powers:
             powers[label.upper()] = normalize_number(value)
+        if is_20td:
+            powers["P3"] = None
         if any(v is not None for v in powers.values()):
             return powers
 
@@ -1471,6 +1478,9 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     result["self_consumption_surplus_kwh"] = extract_surplus_kwh(text)
     if result["retailer"] == "Octopus Energy":
         _extract_octopus_fields(text, result)
+    access_tariff = extract_access_tariff(text, words)
+    if access_tariff == "2.0TD":
+        result["contracted_power_kw_by_periods"]["P3"] = None
     if result["self_consumption_surplus_kwh"] is None and re.search(SURPLUS_LABEL_PATTERN, text, re.IGNORECASE):
         add_issue(
             result, "self_consumption_surplus_kwh", "missing_or_unverified",
@@ -1512,13 +1522,10 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
         if result[field] is None:
             add_issue(result, field, "missing_or_unverified", f"No s'ha pogut verificar l'import de {label} abans d'impostos i amb descomptes. És opcional; cal revisar-lo per proposar el motiu automàtic.")
 
-    access_tariff = extract_access_tariff(text, words)
     # Contracted power is implemented progressively for each retailer.
     for period, value in result["contracted_power_kw_by_periods"].items():
-        # These layouts explicitly use P1/P2 for 2.0TD, with no third power period.
-        if period == "P3" and result["retailer"] in {"Holaluz", "Plenitude", "Pepeenergy", "Octopus Energy"} and access_tariff == "2.0TD" and all(
-            result["contracted_power_kw_by_periods"][key] is not None for key in ("P1", "P2")
-        ):
+        # 2.0TD has only two power periods, regardless of retailer or missing values.
+        if period == "P3" and access_tariff == "2.0TD":
             continue
         if value is None:
             add_issue(result, f"contracted_power_kw_by_periods.{period}", "missing_or_unverified", "No s'ha pogut extreure la potència contractada.")

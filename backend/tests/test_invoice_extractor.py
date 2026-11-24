@@ -16,6 +16,7 @@ class ExtractionTests(unittest.TestCase):
         IBERDROLA CLIENTES, S.A.U.
         Titular del contrato: Persona Persona
         CUPS: ES1234123456789012JY1F
+        Peaje de acceso a la red (ATR): 2.0TD
         Días facturados: 30
         Energía consumida (kWh)
         P1 34,41 kWh
@@ -40,7 +41,7 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(result["competitor_energy_eur"], 30.0)
         self.assertEqual(result["competitor_power_eur"], 10.0)
         self.assertEqual(result["energy_by_periods"], {"P1": 34.41, "P2": 41.55, "P3": 88.63})
-        self.assertEqual(result["contracted_power_kw_by_periods"], {"P1": 3.45, "P2": 3.45, "P3": 3.45})
+        self.assertEqual(result["contracted_power_kw_by_periods"], {"P1": 3.45, "P2": 3.45, "P3": None})
         self.assertEqual(result["meter_rental_eur"], 0.25)
         self.assertEqual(result["vat_amount"], 11.34)
         self.assertEqual(result["vat_rate_percent"], 21.0)
@@ -412,12 +413,13 @@ Vall 3.000,000 3.063,625 1,00 0,000 63,625
         )
 
     def test_extracts_iberdrola_contracted_powers_punta_valle(self):
-        text = "Potencia punta: 4,60 kW\nPotencia valle: 4,60 kW"
-
-        self.assertEqual(
-            extract_contracted_powers(text),
-            {"P1": 4.6, "P2": 4.6, "P3": 4.6},
-        )
+        for punta, valle, expected in (
+            ("3,3", "3,3", {"P1": 3.3, "P2": 3.3, "P3": None}),
+            ("1", "5,75", {"P1": 1.0, "P2": 5.75, "P3": None}),
+        ):
+            with self.subTest(punta=punta, valle=valle):
+                text = f"Potencia punta: {punta} kW\nPotencia valle: {valle} kW"
+                self.assertEqual(extract_contracted_powers(text), expected)
 
     def test_extracts_naturgy_contracted_powers_by_period(self):
         text = "Potencia contratada P1: 10,392 kW\nPotencia contratada P2: 10,392 kW"
