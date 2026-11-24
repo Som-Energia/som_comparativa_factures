@@ -64,7 +64,7 @@ Després cal copiar un correu nou, enganxar-lo en una resposta buida i enviar-lo
 
 ```json
 {
-  "cups": "ES0210002100000000ZN0F",
+  "cups": "ES0210002100000000RN0F",
   "titular": "Persona Persona",
   "billing_days": 30,
   "competitor_invoice_amount": 54.0,
@@ -117,7 +117,7 @@ La resposta inclou les claus del contracte d'entrada de comparativa i conserva d
 ```json
 {
   "retailer": "Iberdrola",
-  "cups": "ES0210002100000000ZN0F",
+  "cups": "ES0210002100000000RN0F",
   "titular": "Persona Persona",
   "billing_days": 30,
   "competitor_invoice_amount": 54.0,

@@ -8,8 +8,8 @@ import unicodedata
 MONEY = r"(-?\s*\d+(?:\.\d{3})*,\d{2}|-?\s*\d+\.\d{2})\s*(?:€|EUR)\s*$"
 BILLED_MONEY = r"(?<![\d,])(-?\s*\d+(?:\.\d{3})*,\d{2}|-?\s*\d+\.\d{2})\s*(?:€|eur\b)(?!\s*/)"
 LABELS = {
-    "energy": r"(?:por energia (?:utilizada|consumida)|subtotal energia demandada|consumo electricidad|energia consumida(?: de la red)?|energia activa|(?:terme|termino|importe|cost|coste) (?:de (?:la )?)?energia|energia|consum|consumo)",
-    "power": r"(?:por potencia (?:contractada|contratada)|(?:terme|termino|importe|cost|coste) (?:de (?:la )?)?potencia(?: (?:contractada|contratada))?|potencia(?: (?:contratada|contractada))?|terme fix|termino fijo)",
+    "energy": r"(?:(?:por|per) energia (?:utilizada|utilitzada|consumida)|subtotal energia demandada|consumo electricidad|consumo facil|energia consumida(?: de la red)?|energia activa|(?:terme|termino|importe|cost|coste) (?:de (?:la )?)?energia|energia|consum|consumo)",
+    "power": r"(?:(?:por|per) potencia (?:contractada|contratada)|(?:terme|termino|importe|cost|coste) (?:de (?:la )?)?potencia(?: (?:contractada|contratada))?|potencia(?: (?:contratada|contractada))?|terme fix|termino fijo)",
 }
 
 
@@ -50,6 +50,7 @@ def _iberdrola_costs(lines):
     energy = {}
     energy_totals = {}
     reading_energy = False
+    single_line = None
     blocks = closed_blocks = 0
     for line in lines:
         if match := re.match(r"total importe potencia hasta \d{2}/\d{2}/\d{4}\s+" + MONEY, line, re.IGNORECASE):
@@ -57,7 +58,14 @@ def _iberdrola_costs(lines):
         if re.match(r"energia consumida\s{2,}", line):
             reading_energy = True
             blocks += 1
-        elif reading_energy and re.match(r"financiacion|total energia|servicios|compensacion|impuestos|iva", line):
+            single_line = line if re.fullmatch(
+                r"energia consumida\s+\d+(?:[.,]\d+)?\s*kwh\s*[x×*]\s*"
+                r"\d+(?:[.,]\d+)?\s*(?:€|eur)/kwh\s+" + MONEY, line,
+            ) else None
+        elif reading_energy and re.match(r"financiacion|cargos normativos|total energia|servicios|compensacion|impuestos|iva", line):
+            if single_line:
+                energy_totals[single_line] = energy[single_line]
+                closed_blocks += 1
             reading_energy = False
         if reading_energy:
             match = re.search(BILLED_MONEY, line)
@@ -71,6 +79,9 @@ def _iberdrola_costs(lines):
             elif line and not re.match(r"horas |energia consumida", line):
                 # An unrecognised amount or subheading in the block needs review.
                 reading_energy = False
+    if reading_energy and single_line:
+        energy_totals[single_line] = energy[single_line]
+        closed_blocks += 1
     energy_cost = sum(energy.values()) if energy else None
     if energy_totals and blocks == closed_blocks:
         total = sum(energy_totals.values())
@@ -84,6 +95,37 @@ def _iberdrola_costs(lines):
     }
 
 
+def _corrected_component_costs(lines):
+    """Accept a global summary only when signed correction totals reconcile."""
+    pattern = re.compile(
+        r"facturacion por (potencia contratada|energia consumida)\s*\([^)]*\)\s*[. ]*" + BILLED_MONEY,
+    )
+    start = next((index for index, line in enumerate(lines) if pattern.search(line)), None)
+    if start is None:
+        return None
+    summary, details = lines[:start], lines[start:]
+    result = {}
+    for kind, label, component in [
+        ("energy", LABELS["energy"], "energia consumida"),
+        ("power", LABELS["power"], "potencia contratada"),
+    ]:
+        amounts = {amount for _, prefix, amount in _label_rows(summary, label) if not prefix}
+        billed = [_amount(match[2]) for line in details
+                  if (match := pattern.search(line)) and match[1] == component]
+        if len(amounts) != 1 or not billed:
+            return None
+        amount = next(iter(amounts))
+        if amount < 0 or abs(sum(billed) - amount) > Decimal("0.02"):
+            return None
+        result[f"competitor_{kind}_eur"] = float(amount)
+    total_pattern = r"\btotal importe factura\s*[. ]*" + BILLED_MONEY
+    summary_totals = {_amount(match[1]) for line in summary if (match := re.search(total_pattern, line))}
+    detail_totals = [_amount(match[1]) for line in details if (match := re.search(total_pattern, line))]
+    if len(summary_totals) != 1 or not detail_totals or abs(sum(detail_totals) - next(iter(summary_totals))) > Decimal("0.02"):
+        return None
+    return result
+
+
 def extract_component_costs(text: str) -> dict[str, float | None]:
     """Prefer explicit totals; otherwise require all periods and apply explicit discounts.
 
@@ -92,10 +134,12 @@ def extract_component_costs(text: str) -> dict[str, float | None]:
     """
     lines = [_normalized(line).strip() for line in text.splitlines()]
     result = {"competitor_energy_eur": None, "competitor_power_eur": None}
-    if any(re.search(r"cuota fija|quota fixa", line) for line in lines):
-        return result
     if any(line.startswith("total importe potencia hasta ") for line in lines):
         return _iberdrola_costs(lines)
+    if any(re.search(r"\bfacturacion por (?:potencia contratada|energia consumida)\s*\(", line) for line in lines):
+        return _corrected_component_costs(lines) or result
+    if any(re.search(r"cuota fija|quota fixa|tarifa justa|tarifa personalizada", line) for line in lines):
+        return result
 
     discounts = {"energy": Decimal("0"), "power": Decimal("0")}
     uncertain = set()
@@ -130,6 +174,7 @@ def extract_component_costs(text: str) -> dict[str, float | None]:
         for financial, prefix, amount in _label_rows(lines, label):
             # Factor Energia explicitly states that the agreed discount is included.
             prefix = re.sub(r"^\(el preu inclou el(?: descompte acordat\))?\s*", "", prefix)
+            prefix = re.sub(r"^\(\d{2}-\d{2}-\d{4}\s*-\s*\d{2}-\d{2}-\d{4}\)\s*:\s*", "", prefix)
             # Never mistake a unit price (€/kWh, €/kW/day) for an amount.
             if prefix.endswith(("/", "x", "×", "*")):
                 continue
@@ -154,6 +199,14 @@ def extract_component_costs(text: str) -> dict[str, float | None]:
                 total = next(iter(totals))
                 if not discount and (detailed is None or abs(total - detailed) <= Decimal("0.02")):
                     value = total
+                elif kind == "energy" and not discount and detailed is not None:
+                    # Plenitude includes this separately billed adjustment in its
+                    # energy summary; reconcile it, then retain consumption alone.
+                    adjustments = {line: _amount(match[1]) for line in lines if (match := re.match(
+                        r"ajuste por variacion del coste de los peajes y cargos del sistema\b.*?" + BILLED_MONEY, line,
+                    ))}
+                    if adjustments and abs(total - detailed - sum(adjustments.values())) <= Decimal("0.02"):
+                        value = detailed
                 elif detailed is not None:
                     # Summary can be gross or already net: avoid a double discount.
                     net = detailed + discount

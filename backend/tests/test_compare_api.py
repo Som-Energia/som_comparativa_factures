@@ -11,7 +11,7 @@ pytestmark = pytest.mark.usefixtures("reference_pricing")
 
 def build_payload(**overrides):
     payload = {
-        "cups": "ES0210002100000000ZN0F",
+        "cups": "ES0210002100000000RN0F",
         "titular": "Persona Persona",
         "billing_days": 30,
         "competitor_invoice_amount": 54.0,
@@ -42,7 +42,7 @@ def test_compare_returns_report_summary_for_valid_payload():
     assert response.status_code == 200
     body = response.get_json()
     assert body["customer"] == {
-        "cups": "ES0210002100000000ZN0F",
+        "cups": "ES0210002100000000RN0F",
         "titular": "Persona Persona",
     }
     assert body["comparison"] == {
@@ -112,6 +112,21 @@ def test_compare_returns_validation_errors_for_invalid_payload():
             "energy_by_periods.P1": "El consum del període P1 ha de ser positiu o zero.",
         }
     }
+
+
+@pytest.mark.parametrize("cups", ["ES1234123456789012XY", "ES001234567890123456", 123, None])
+def test_compare_rejects_invalid_manual_cups(cups):
+    response = create_app().test_client().post("/api/compare", json=build_payload(cups=cups))
+    assert response.status_code == 400
+    assert "cups" in response.get_json()["errors"]
+
+
+def test_compare_normalizes_manual_cups():
+    response = create_app().test_client().post(
+        "/api/compare", json=build_payload(cups="es 1234-123456789012-jy 1f"),
+    )
+    assert response.status_code == 200
+    assert response.get_json()["customer"]["cups"] == "ES1234123456789012JY1F"
 
 
 def test_component_costs_are_optional_and_do_not_change_simulation_total():
@@ -507,7 +522,7 @@ def test_compare_rejects_negative_billing_values_and_invalid_percentages():
 def build_extraction():
     return {
         "retailer": "Iberdrola",
-        "cups": "ES0210002100000000ZN0F",
+        "cups": "ES0210002100000000RN0F",
         "titular": "Persona Persona",
         "billing_days": 30,
         "competitor_invoice_amount": 54.0,
@@ -562,7 +577,7 @@ def test_internal_extraction_returns_the_comparison_input():
 
     assert response.status_code == 200
     assert response.get_json()["comparison_input"] == {
-        "cups": "ES0210002100000000ZN0F",
+        "cups": "ES0210002100000000RN0F",
         "titular": "Persona Persona",
         "billing_days": 30,
         "competitor_invoice_amount": 54.0,

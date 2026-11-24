@@ -40,6 +40,7 @@ const reviewableFormFields = new Set([
   'vat_rate_percent',
   'electric_tax_rate_percent',
   'self_consumption_surplus_kwh',
+  'energy_by_periods',
   'energy_by_periods.P1',
   'energy_by_periods.P2',
   'energy_by_periods.P3',
@@ -596,6 +597,11 @@ function CompareScreen() {
 
           <section className="form-section">
             <h3>Energia</h3>
+            {extractionIssues.filter((issue) => issue.field === 'energy_by_periods').map((issue) => (
+              <p key={issue.code} className="field-issue" role="status">
+                {issue.code === 'estimated_consumption' ? 'El consum indicat a la factura és estimat' : issue.message}
+              </p>
+            ))}
             <div className="period-grid">
               {['P1', 'P2', 'P3'].map((period) => (
                 <label key={period}>
@@ -621,7 +627,7 @@ function CompareScreen() {
                 name="self_consumption_surplus_kwh"
                 autoComplete="on"
                 min="0"
-                step="0.01"
+                step="0.001"
                 value={form.self_consumption_surplus_kwh}
                 onChange={(event) => updateField('self_consumption_surplus_kwh', event.target.value)}
                 onBlur={(event) => {
@@ -651,7 +657,7 @@ function CompareScreen() {
                   spellCheck="false"
                   value={rawJson}
                   onChange={(event) => setRawJson(event.target.value)}
-                  placeholder={'{\n  "cups": "ES0210002100000000ZN0F",\n  "titular": "Persona Persona"\n}'}
+                  placeholder={'{\n  "cups": "ES0210002100000000RN0F",\n  "titular": "Persona Persona"\n}'}
                 />
                 <FieldError error={errors.raw_json} />
               </label>

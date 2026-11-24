@@ -15,7 +15,8 @@ class ExtractionTests(unittest.TestCase):
         text = """
         IBERDROLA CLIENTES, S.A.U.
         Titular del contrato: Persona Persona
-        CUPS: ES0000000000000000TEST
+        CUPS: ES1234123456789012JY1F
+        Peaje de acceso a la red (ATR): 2.0TD
         Días facturados: 30
         Energía consumida (kWh)
         P1 34,41 kWh
@@ -33,14 +34,14 @@ class ExtractionTests(unittest.TestCase):
         result = extract_from_text(text)
 
         self.assertEqual(result["retailer"], "Iberdrola")
-        self.assertEqual(result["cups"], "ES0000000000000000TEST")
+        self.assertEqual(result["cups"], "ES1234123456789012JY1F")
         self.assertEqual(result["titular"], "Persona Persona")
         self.assertEqual(result["billing_days"], 30)
         self.assertEqual(result["competitor_invoice_amount"], 54.0)
         self.assertEqual(result["competitor_energy_eur"], 30.0)
         self.assertEqual(result["competitor_power_eur"], 10.0)
         self.assertEqual(result["energy_by_periods"], {"P1": 34.41, "P2": 41.55, "P3": 88.63})
-        self.assertEqual(result["contracted_power_kw_by_periods"], {"P1": 3.45, "P2": 3.45, "P3": 3.45})
+        self.assertEqual(result["contracted_power_kw_by_periods"], {"P1": 3.45, "P2": 3.45, "P3": None})
         self.assertEqual(result["meter_rental_eur"], 0.25)
         self.assertEqual(result["vat_amount"], 11.34)
         self.assertEqual(result["vat_rate_percent"], 21.0)
@@ -64,7 +65,7 @@ class ExtractionTests(unittest.TestCase):
 
         self.assertEqual(extract_from_text(text)["retailer"], "Holaluz")
 
-    def test_defers_new_holaluz_component_costs_without_changing_existing_extraction(self):
+    def test_extracts_holaluz_component_costs_without_changing_existing_extraction(self):
         for retailer in ("Holaluz", "Hola Luz"):
             with self.subTest(retailer=retailer):
                 result = extract_from_text(f"""{retailer}
@@ -73,10 +74,10 @@ Potencia 10,00 €
 Total a pagar: 54,00 EUR""")
                 self.assertEqual(result["retailer"], "Holaluz")
                 self.assertEqual(result["competitor_invoice_amount"], 54)
-                self.assertIsNone(result["competitor_energy_eur"])
-                self.assertIsNone(result["competitor_power_eur"])
+                self.assertEqual(result["competitor_energy_eur"], 30)
+                self.assertEqual(result["competitor_power_eur"], 10)
                 issues = {issue["field"] for issue in result["data_quality"]["issues"]}
-                self.assertTrue({"competitor_energy_eur", "competitor_power_eur"} <= issues)
+                self.assertFalse({"competitor_energy_eur", "competitor_power_eur"} & issues)
 
     def test_detects_factor_energia_retailer(self):
         self.assertEqual(
@@ -85,7 +86,7 @@ Total a pagar: 54,00 EUR""")
         )
 
     def test_extracts_factor_energia_holder_from_apellidos_nombre(self):
-        text = "Titular: ARAGON VERNET, CARLOS\nCUPS: ES0000000000000000TEST"
+        text = "Titular: ARAGON VERNET, CARLOS\nCUPS: ES1234123456789012JY1F"
 
         self.assertEqual(extract_from_text(text)["titular"], "Carlos Aragon Vernet")
 
@@ -110,20 +111,20 @@ Total a pagar: 54,00 EUR""")
 
     def test_normalizes_a_cups_written_with_spaces(self):
         result = extract_from_text(
-            "Identificación punto de suministro (CUPS): ES 0000 0000 0000 0000 TEST"
+            "Identificación punto de suministro (CUPS): ES 1234 1234 5678 9012 JY 1F"
         )
 
-        self.assertEqual(result["cups"], "ES0000000000000000TEST")
+        self.assertEqual(result["cups"], "ES1234123456789012JY1F")
 
     def test_uses_layout_for_a_cups_on_the_same_row_as_its_label(self):
         words = [
             (0, 200, 329, 230, 337, "(CUPS):", 0, 0, 0),
-            (0, 236, 329, 360, 337, "ES0000000000000000TEST", 0, 0, 1),
+            (0, 236, 329, 360, 337, "ES1234123456789012JY1F", 0, 0, 1),
         ]
 
         result = extract_from_text("(CUPS):", words)
 
-        self.assertEqual(result["cups"], "ES0000000000000000TEST")
+        self.assertEqual(result["cups"], "ES1234123456789012JY1F")
 
     def test_uses_layout_to_read_titular_instead_of_the_next_text_line(self):
         words = [
@@ -187,6 +188,69 @@ Total a pagar: 54,00 EUR""")
     def test_extracts_endesa_meter_rental(self):
         text = "Alquiler del contador ( 30 días x 0,026943 Eur/día ) ........................................0,81 €"
         self.assertEqual(extract_meter_rental(text), 0.81)
+
+    def test_extracts_complete_endesa_invoice_in_both_languages(self):
+        labels = [
+            ("Titular del contracte", "Període de facturació", "dies", "Consum", "Pla", "Vall",
+             "Potències contractades", "punta-pla", "vall", "Lloguer del comptador", "Impost electricitat"),
+            ("Titular del contrato", "Periodo de facturación", "días", "Consumo", "Llano", "Valle",
+             "Potencias contratadas", "punta-llano", "valle", "Alquiler del contador", "Impuesto electricidad"),
+        ]
+        for holder, period, days, consumption, flat, valley, powers, peak_power, valley_power, rental, tax in labels:
+            with self.subTest(language=period):
+                text = f"""
+Endesa Energía
+{holder}: Persona Sintètica Exemple  CUPS: ES1234123456789012JY1F
+{period}: del 01/04/2026 a 01/05/2026 (30 {days})
+{powers}: {peak_power} 3,450 kW; {valley_power} 4,600 kW
+{consumption} Punta 21,125 kWh x 0,160000 Eur/kWh ........3,38 €
+{consumption} {flat} 35,250 kWh x 0,090000 Eur/kWh ........3,17 €
+{consumption} {valley} 63,625 kWh x 0,060000 Eur/kWh ........3,82 €
+{rental} ( 30 {days} x 0,027000 Eur/dia ) ........0,81 €
+{tax} ( 40,00 Eur X 5,1126963 %) ........2,05 €
+IVA normal 21 % s/ 42,86 ........9,00 €
+Total a pagar: 51,86 €
+"""
+                result = extract_from_text(text)
+
+                self.assertEqual(result["titular"], "Persona Sintètica Exemple")
+                self.assertEqual(result["cups"], "ES1234123456789012JY1F")
+                self.assertEqual(result["billing_days"], 30)
+                self.assertEqual(result["energy_by_periods"], {"P1": 21.125, "P2": 35.25, "P3": 63.625})
+                self.assertEqual(result["contracted_power_kw_by_periods"], {"P1": 3.45, "P2": 3.45, "P3": 4.6})
+                self.assertEqual(result["meter_rental_eur"], 0.81)
+                self.assertEqual(result["electricity_tax"], 2.05)
+                self.assertEqual(result["electric_tax_rate_percent"], 5.1126963)
+                self.assertEqual(result["vat_amount"], 9.0)
+                self.assertEqual(result["vat_rate_percent"], 21.0)
+                self.assertEqual(result["competitor_invoice_amount"], 51.86)
+                self.assertEqual(result["data_quality"]["status"], "needs_review")
+                optional_issues = {"competitor_power_eur"}
+                if consumption == "Consum":
+                    optional_issues.add("competitor_energy_eur")
+                self.assertEqual(
+                    {issue["field"] for issue in result["data_quality"]["issues"]},
+                    optional_issues,
+                )
+
+    def test_prefers_explicit_billing_days_over_date_calculation(self):
+        for period, days in [("Període de facturació", "dies"), ("Periodo de facturación", "días")]:
+            with self.subTest(language=period):
+                # The stated count wins even when the date difference is different.
+                text = f"{period}: del 01/04/2026 a 01/05/2026 (31 {days})"
+                self.assertEqual(extract_billing_days(text), (31, False))
+
+    def test_does_not_use_unrelated_parenthesized_days_as_billing_days(self):
+        text = "Període de facturació: del 01/04/2026 a 01/05/2026\nTermini de pagament (15 dies)"
+        self.assertEqual(extract_billing_days(text), (30, True))
+
+    def test_extracts_catalan_endesa_consumption_from_readings_table(self):
+        text = """
+Punta 1.000,000 1.021,125 1,00 0,000 21,125
+Pla 2.000,000 2.035,250 1,00 0,000 35,250
+Vall 3.000,000 3.063,625 1,00 0,000 63,625
+"""
+        self.assertEqual(extract_energy_by_periods(text), {"P1": 21.125, "P2": 35.25, "P3": 63.625})
 
     def test_extracts_energia_xxi_meter_rental(self):
         text = "Alquiler del contador:                                         ( 30 días x 0,026943 Eur/día ) ....................................................................................................................0,81 €"
@@ -349,12 +413,13 @@ Total a pagar: 54,00 EUR""")
         )
 
     def test_extracts_iberdrola_contracted_powers_punta_valle(self):
-        text = "Potencia punta: 4,60 kW\nPotencia valle: 4,60 kW"
-
-        self.assertEqual(
-            extract_contracted_powers(text),
-            {"P1": 4.6, "P2": 4.6, "P3": 4.6},
-        )
+        for punta, valle, expected in (
+            ("3,3", "3,3", {"P1": 3.3, "P2": 3.3, "P3": None}),
+            ("1", "5,75", {"P1": 1.0, "P2": 5.75, "P3": None}),
+        ):
+            with self.subTest(punta=punta, valle=valle):
+                text = f"Potencia punta: {punta} kW\nPotencia valle: {valle} kW"
+                self.assertEqual(extract_contracted_powers(text), expected)
 
     def test_extracts_naturgy_contracted_powers_by_period(self):
         text = "Potencia contratada P1: 10,392 kW\nPotencia contratada P2: 10,392 kW"
@@ -625,16 +690,35 @@ Total a pagar: 54,00 EUR""")
         )
 
     def test_extracts_iberdrola_declared_consumption_by_period(self):
-        text = """
+        for llano in ("41", "41,5", "41,50", "41,500"):
+            with self.subTest(llano=llano):
+                text = f"""
         Las lecturas desagregadas tomadas el 31/08/2025 son: punta: 1.697 kWh;
         llano: 1.896 kWh; valle 4.289 kWh. Sus consumos desagregados han sido
-        punta: 39 kWh; llano: 41 kWh; valle 75 kWh.
+        punta: 39 kWh; llano: {llano} kWh; valle 75 kWh.
         """
 
-        self.assertEqual(
-            extract_energy_by_periods(text),
-            {"P1": 39.0, "P2": 41.0, "P3": 75.0},
-        )
+                self.assertEqual(
+                    extract_energy_by_periods(text),
+                    {"P1": 39.0, "P2": 41.0 if llano == "41" else 41.5, "P3": 75.0},
+                )
+
+    def test_power_billing_rows_do_not_supply_consumption(self):
+        lines = [
+            "Punta 4,40 kW x 31 días x 0,110 €/kW día 15,06 €",
+            "Valle 4,40 kW x 31 días x 0,014 €/kW día 1,95 €",
+        ]
+        words = [
+            (0, column * 40, row * 20, column * 40 + 30, row * 20 + 8, token)
+            for row, line in enumerate(lines)
+            for column, token in enumerate(line.split())
+        ]
+        for layout in (None, words):
+            with self.subTest(layout=layout is not None):
+                self.assertEqual(
+                    extract_energy_by_periods("\n".join(lines), layout),
+                    {"P1": None, "P2": None, "P3": None},
+                )
 
     def test_extracts_repsol_detailed_energy_by_period(self):
         text = """

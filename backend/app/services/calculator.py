@@ -5,6 +5,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from app.config import load_pricing_config
 from app.services.comparison_reason import suggest_comparison_reason
+from app.services.cups import is_valid_cups, normalize_cups
 
 
 TWOPLACES = Decimal("0.01")
@@ -173,9 +174,12 @@ def build_comparison_report(payload: dict) -> dict:
 def _validate_payload(payload: dict) -> ComparisonInput:
     errors: dict[str, str] = {}
 
-    cups = str(payload.get("cups", "")).strip()
-    if not cups:
+    raw_cups = payload.get("cups", "")
+    cups = normalize_cups(raw_cups) if isinstance(raw_cups, str) else ""
+    if raw_cups is None or (isinstance(raw_cups, str) and not raw_cups.strip()):
         errors["cups"] = "El CUPS és obligatori."
+    elif not is_valid_cups(cups):
+        errors["cups"] = "El CUPS no té un format o unes lletres de control vàlids."
 
     titular = str(payload.get("titular", "")).strip()
     if not titular:
