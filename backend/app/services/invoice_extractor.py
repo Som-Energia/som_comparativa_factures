@@ -675,6 +675,8 @@ def extract_total_amount(text: str, words: list[tuple[Any, ...]] | None = None) 
 
 def _extract_consumption_table(words: list[tuple[Any, ...]]) -> dict[str, float | None] | None:
     """Read labeled period rows within the consumption column, not adjacent readings."""
+    if (table := _extract_endesa_consumption_table(words)) is not None:
+        return table
     for label in words:
         if not re.fullmatch(r"consum(?:o)?", label[5], re.IGNORECASE):
             continue
@@ -715,6 +717,55 @@ def _extract_consumption_table(words: list[tuple[Any, ...]]) -> dict[str, float 
             if key in periods:
                 break  # Do not mix another table into the same set of periods.
             periods[key] = normalize_number(values[0][5]) if len(values) == 1 else None
+            if len(periods) == 3:
+                break
+        if periods:
+            return {period: periods.get(period) for period in ("P1", "P2", "P3")}
+    return None
+
+
+def _extract_endesa_consumption_table(words: list[tuple[Any, ...]]) -> dict[str, float | None] | None:
+    """Identify the readings table by its headers and read only its consumption cells."""
+    for label in words:
+        if not re.fullmatch(r"consum(?:o)?", label[5], re.IGNORECASE):
+            continue
+        page_words = [word for word in words if word[0] == label[0]]
+        header = [word for word in page_words if abs(word[2] - label[2]) < 3]
+        adjustment = next((word for word in header if word[3] < label[1]
+                           and re.fullmatch(r"ajuste?", word[5], re.IGNORECASE)), None)
+        multiplier = next((word for word in header if re.fullmatch(
+            r"multipl\.", word[5], re.IGNORECASE,
+        )), None)
+        period_header = next((word for word in header if re.fullmatch(
+            r"per[ií]od[oe]", word[5], re.IGNORECASE,
+        )), None)
+        if adjustment is None or multiplier is None or period_header is None:
+            continue
+        if not period_header[3] < multiplier[1] < adjustment[1]:
+            continue
+        left = (adjustment[3] + label[1]) / 2
+        right = label[3] + 3
+        # The kWh unit sits on a separate row headed Energia/Energía.
+        energy_header = next((word for word in sorted(page_words, key=lambda word: word[2])
+                              if word[2] > label[4] and abs(word[1] - period_header[1]) < 3
+                              and re.fullmatch(r"energ[ií]a", word[5], re.IGNORECASE)
+                              and any(abs(unit[2] - word[2]) < 3 and left <= unit[1] < right
+                                      and unit[5].casefold() == "kwh" for unit in page_words)), None)
+        if energy_header is None:
+            continue
+        row_labels = sorted(
+            (word for word in page_words if word[2] > energy_header[4]
+             and abs(word[1] - period_header[1]) < 3), key=lambda word: word[2],
+        )
+        periods = {}
+        for row in row_labels:
+            period = NAMED_ENERGY_PERIODS.get(row[5].casefold())
+            if period is None or period in periods:
+                break  # A new section or another table must not fill missing cells.
+            values = [word for word in page_words if abs(word[2] - row[2]) < 3
+                      and left <= (word[1] + word[3]) / 2 <= right
+                      and re.fullmatch(NUMBER_PATTERN, word[5])]
+            periods[period] = normalize_number(values[0][5]) if len(values) == 1 else None
             if len(periods) == 3:
                 break
         if periods:
@@ -1140,21 +1191,17 @@ def extract_meter_rental(text: str) -> float | None:
     if equipment:
         return normalize_number(equipment.group(1))
 
-    # Endesa: "Alquiler del contador ( N días x N €/día ) ....N,NN €"
-    m = re.search(
-        rf"{ENDESA_METER_RENTAL_LABEL}\s*\([^)]+\)\s*\.+\s*({AMOUNT_PATTERN[1:-1]})\s*€",
+    # Endesa / Energía XXI can split rental into several billed segments.
+    # Only formula rows qualify: a summary must not be added to its own detail.
+    rental_segments = re.findall(
+        rf"{ENDESA_METER_RENTAL_LABEL}\s*:?\s*\([^)]+\)\s*\.+\s*({NUMBER_PATTERN})\s*€",
         text, re.IGNORECASE,
     )
-    if m:
-        return normalize_number(m.group(1))
-
-    # Energía XXI: "Alquiler del contador: ( N días x N €/día ) ....N,NN €"
-    m = re.search(
-        rf"{ENDESA_METER_RENTAL_LABEL}\s*:\s*\([^)]+\)\s*\.+\s*({AMOUNT_PATTERN[1:-1]})\s*€",
-        text, re.IGNORECASE,
-    )
-    if m:
-        return normalize_number(m.group(1))
+    if rental_segments:
+        return float(sum(
+            (Decimal(value.replace(".", "").replace(",", ".")) if "," in value else Decimal(value)
+             for value in rental_segments), Decimal("0"),
+        ))
 
     # Iberdrola: "Alquiler equipos medida  N días x N €/día  N,NN €"
     # L'import final és l'últim número de la línia

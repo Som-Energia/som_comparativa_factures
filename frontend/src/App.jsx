@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import EmailComposer from './EmailComposer'
+import { extractionSummary, optionalCostFields, optionalCostIssueFields } from './extractionFeedback.js'
 
 const apiBaseUrl = '/api'
 const appVersion = __APP_VERSION__
@@ -34,8 +35,6 @@ const reviewableFormFields = new Set([
   'titular',
   'billing_days',
   'competitor_invoice_amount',
-  'competitor_energy_eur',
-  'competitor_power_eur',
   'meter_rental_eur',
   'vat_rate_percent',
   'electric_tax_rate_percent',
@@ -107,6 +106,13 @@ function CompareScreen() {
   const [extractingInvoice, setExtractingInvoice] = useState(false)
   const [extractionIssues, setExtractionIssues] = useState([])
   const [extractedFileName, setExtractedFileName] = useState('')
+  const [optionalCostsOpen, setOptionalCostsOpen] = useState(false)
+
+  useEffect(() => {
+    if (errors.competitor_energy_eur || errors.competitor_power_eur) {
+      setOptionalCostsOpen(true)
+    }
+  }, [errors])
 
   useEffect(() => {
     let cancelled = false
@@ -323,6 +329,7 @@ function CompareScreen() {
       setExtractionIssues(data.extraction.data_quality.issues)
       setRetailer(data.extraction.retailer || '')
       setExtractedFileName(file.name)
+      setOptionalCostsOpen(false)
       setInputMode('form')
       setPreview(null)
     } catch {
@@ -404,7 +411,10 @@ function CompareScreen() {
   const formIssueFields = new Set(
     extractionIssues.map((issue) => issue.field).filter((field) => reviewableFormFields.has(field)),
   )
-  const extractionOnlyIssues = extractionIssues.filter((issue) => !reviewableFormFields.has(issue.field))
+  const optionalIssueFields = optionalCostIssueFields(extractionIssues, form)
+  const extractionOnlyIssues = extractionIssues.filter((issue) => (
+    !reviewableFormFields.has(issue.field) && !optionalCostFields.has(issue.field)
+  ))
 
   return (
     <div className="layout">
@@ -420,7 +430,7 @@ function CompareScreen() {
             <FieldError error={errors.pdf} />
           </label>
           {extractingInvoice && <p className="field-help">Extraient dades de la factura...</p>}
-          {extractedFileName && <p className="status-message">{extractionSummary(extractedFileName, formIssueFields.size)}</p>}
+          {extractedFileName && <p className="status-message" role="status">{extractionSummary(extractedFileName, formIssueFields.size, optionalIssueFields.size)}</p>}
           {extractionOnlyIssues.length > 0 && (
             <p className="field-help">
               No s'ha pogut extreure, però no afecta el càlcul: {extractionOnlyIssues.map((issue) => extractionOnlyFieldLabels[issue.field] ?? issue.field).join(', ')}.
@@ -550,27 +560,6 @@ function CompareScreen() {
                 <FieldIssue issues={extractionIssues} field="electric_tax_rate_percent" />
               </label>
             </div>
-            <div className="two-column-grid">
-              {[
-                ['competitor_energy_eur', 'Import del consum — companyia actual (€)'],
-                ['competitor_power_eur', 'Import de la potència — companyia actual (€)'],
-              ].map(([field, label]) => (
-                <label key={field}>
-                  {label}
-                  <input
-                    type="number"
-                    name={field}
-                    min="0"
-                    step="0.01"
-                    value={form[field]}
-                    onChange={(event) => updateField(field, event.target.value)}
-                  />
-                  <FieldError error={errors[field]} />
-                  <FieldIssue issues={extractionIssues} field={field} />
-                </label>
-              ))}
-            </div>
-            <p className="field-help">Imports opcionals extrets del PDF per proposar el motiu del correu. Reviseu que siguin del mateix període, abans d’impostos i amb els descomptes aplicats. El consum no ha d’incloure compensació d’excedents ni serveis addicionals o d’ajust facturats separadament. Podeu completar-los o corregir-los; no modifiquen el total de la simulació.</p>
           </section>
 
           <section className="form-section">
@@ -640,6 +629,45 @@ function CompareScreen() {
               <FieldIssue issues={extractionIssues} field="self_consumption_surplus_kwh" />
             </label>
           </section>
+
+          <details
+            className="form-section optional-cost-section"
+            open={optionalCostsOpen}
+            onToggle={(event) => setOptionalCostsOpen(event.currentTarget.open)}
+            onInvalidCapture={() => setOptionalCostsOpen(true)}
+          >
+            <summary>
+              Imports opcionals per al correu <span className="optional-cost-caption">· No afecten la simulació</span>
+            </summary>
+            <p id="optional-cost-help" className="field-help">Imports de la companyia actual, abans d’impostos i amb descomptes. Podeu deixar-los en blanc.</p>
+            <div className="two-column-grid">
+              {[
+                ['competitor_energy_eur', 'Import del consum (€)'],
+                ['competitor_power_eur', 'Import de la potència (€)'],
+              ].map(([field, label]) => (
+                <label key={field}>
+                  {label}
+                  <input
+                    type="number"
+                    name={field}
+                    aria-describedby={`optional-cost-help${optionalIssueFields.has(field) ? ` ${field}-help` : ''}`}
+                    min="0"
+                    step="0.01"
+                    value={form[field]}
+                    onChange={(event) => updateField(field, event.target.value)}
+                  />
+                  <FieldError error={errors[field]} />
+                  {optionalIssueFields.has(field) && (
+                    <span id={`${field}-help`} className="field-help">Import no extret. Podeu deixar-lo en blanc.</span>
+                  )}
+                </label>
+              ))}
+            </div>
+            <details className="optional-cost-guidance">
+              <summary>Com identificar aquests imports?</summary>
+              <p className="field-help">Han de correspondre al mateix període de la factura i serveixen per suggerir el motiu del correu. El consum no ha d’incloure compensació d’excedents ni serveis addicionals o d’ajust facturats separadament.</p>
+            </details>
+          </details>
 
             </>
           ) : (
@@ -1158,16 +1186,6 @@ function FieldIssue({ issues, field }) {
         <strong>Reviseu aquest camp.</strong> {issue.message}
       </span>
     ))
-}
-
-function extractionSummary(fileName, issueCount) {
-  if (issueCount === 0) {
-    return `Dades extretes de ${fileName}. No hi ha cap camp pendent de revisar.`
-  }
-  if (issueCount === 1) {
-    return `Dades extretes de ${fileName}. Cal revisar 1 camp marcat al formulari.`
-  }
-  return `Dades extretes de ${fileName}. Cal revisar ${issueCount} camps marcats al formulari.`
 }
 
 function FieldError({ error }) {

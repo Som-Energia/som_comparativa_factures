@@ -475,6 +475,26 @@ label:has(.field-issue) input {
   font-weight: var(--font-weight-message);
 }
 
+.optional-cost-section > summary {
+  cursor: pointer;
+  font-weight: var(--font-weight-section);
+}
+
+.optional-cost-caption {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  font-weight: 400;
+}
+
+.optional-cost-guidance {
+  margin-top: 12px;
+  font-size: var(--font-size-small);
+}
+
+.optional-cost-guidance > summary {
+  cursor: pointer;
+}
+
 .placeholder {
   color: var(--color-text-muted);
 }
