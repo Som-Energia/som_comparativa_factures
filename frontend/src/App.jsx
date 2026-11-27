@@ -83,7 +83,9 @@ function App() {
         </div>
       </section>
 
-      {screen === 'compare' && <CompareScreen />}
+      <div hidden={screen !== 'compare'}>
+        <CompareScreen />
+      </div>
       {screen === 'templates' && <TemplateEditorScreen />}
       {screen === 'pricing' && <PricingScreen />}
     </main>
