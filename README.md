@@ -220,7 +220,11 @@ Enganxeu `compose.yml` com a Stack a Portainer, afegiu les variables i desplegue
 
 ### Sincronitzacio de preus ERP
 
-El servei intern `pricing-sync` consulta diariament a les 00:10, en hora `Europe/Madrid`, la tarifa `2.0TD` de l'ERP per a la data situada 31 dies en el futur. La tarifa futura ja publicada s'aplica immediatament a la comparativa; `effective_date` n'indica la data d'entrada en vigor. Si la consulta falla o retorna dades invalides, es conserva l'ultim `pricing.json` valid.
+El servei intern `pricing-sync` consulta diàriament a les 00:10, en hora `Europe/Madrid`, la tarifa `2.0TD` de l'ERP per a la data situada **38 dies en el futur**. Aquest marge afegeix una setmana als 31 dies per incorporar les tarifes publicades el dimecres o dijous anterior. La tarifa futura ja publicada s'aplica immediatament a la comparativa; `effective_date` n'indica la data d'entrada en vigor. Si la consulta falla o retorna dades invàlides, es conserva l'últim `pricing.json` vàlid.
+
+Per exemple, el 26/11/2026 es consulta el 03/01/2027 i es pot incorporar la tarifa que entra en vigor l'01/01/2027. Si es publica després de les 00:10, es detectarà en la següent sincronització diària o en reiniciar el servei.
+
+Els logs de `pricing-sync` a Portainer mostren l'arrencada i l'horari, la data consultada, l'inici de cada fase (tarifa, serveis d'ajust i desament), la tarifa i les dates rebudes, la confirmació de desament amb la durada i la propera execució amb zona horària. Els errors inclouen el traceback; l'última fase registrada permet localitzar la fallada. Els missatges de nivell `INFO` estan habilitats i no es registren les credencials ni les respostes completes de l'ERP. El camp `synced_at` de `GET /api/pricing` permet comprovar l'última sincronització desada.
 
 La mateixa sincronització obté els serveis d'ajust amb `giscedata.polissa.tarifa.get_last_month_average_prices_www("2.0TD", "ssaa")`. Els preus P1, P2 i P3 es desen a `adjustment_service_prices_eur_per_kwh`, en €/kWh sense impostos, i s'apliquen al consum de cada període. El backend arrodoneix la suma a cèntims i inclou l'import a la base de l'impost elèctric. Aquest concepte ja no es demana al formulari; els valors enviats pel client no substitueixen els preus configurats.
 

@@ -67,7 +67,12 @@
       </div>
 
       <h2 class="section-title">{{ copy.detail_title }}</h2>
-      <div class="identity"><strong>{{ copy.holder }}</strong><strong>{{ report.customer.titular }}</strong><strong>CUPS:</strong><strong>{{ report.customer.cups }}</strong></div>
+      {% if report.customer.titular or report.customer.cups %}
+      <div class="identity">
+        {% if report.customer.titular %}<strong>{{ copy.holder }}</strong><strong>{{ report.customer.titular }}</strong>{% endif %}
+        {% if report.customer.cups %}<strong>CUPS:</strong><strong>{{ report.customer.cups }}</strong>{% endif %}
+      </div>
+      {% endif %}
 
       <h3 class="invoice-title">{{ copy.invoice_data }}</h3>
       <div class="invoice">

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { extractionSummary, optionalCostIssueFields } from './extractionFeedback.js'
+import { extractionSummary, optionalCostIssueFields, optionalIdentityIssueFields } from './extractionFeedback.js'
 
 const energy = 'competitor_energy_eur'
 const power = 'competitor_power_eur'
@@ -41,4 +41,25 @@ test('l’extracció completa no mostra avisos d’imports absents', () => {
   const message = extractionSummary('factura.pdf', 0, 0)
   assert.match(message, /No hi ha cap camp pendent/)
   assert.doesNotMatch(message, /sense extreure|Cal revisar/)
+})
+
+test('titular i CUPS absents es comuniquen com a opcionals, sense exigir revisió', () => {
+  const issues = [{ field: 'cups' }, { field: 'titular' }, { field: 'billing_days' }]
+  for (const empty of ['', null, undefined, '  ']) {
+    const fields = optionalIdentityIssueFields(issues, { cups: empty, titular: empty })
+    assert.deepEqual([...fields], ['cups', 'titular'])
+    const message = extractionSummary('factura.pdf', 0, 0, fields.size)
+    assert.match(message, /Podeu continuar/)
+    assert.match(message, /dades identificatives opcionals/)
+    assert.doesNotMatch(message, /Cal revisar/)
+  }
+})
+
+test('els identificadors opcionals no amaguen avisos necessaris i deixen d’avisar en completar-los', () => {
+  const issues = [{ field: 'cups' }, { field: 'titular' }]
+  assert.equal(optionalIdentityIssueFields(issues, { cups: 'ES1234123456789012JY', titular: 'Persona' }).size, 0)
+  const message = extractionSummary('factura.pdf', 1, 2, 2)
+  assert.match(message, /Cal revisar 1 camp/)
+  assert.match(message, /imports opcionals/)
+  assert.match(message, /dades identificatives opcionals/)
 })
