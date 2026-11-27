@@ -108,13 +108,12 @@ def test_compare_returns_validation_errors_for_invalid_payload():
     assert response.get_json() == {
         "errors": {
             "billing_days": "Els dies facturats han de ser un enter positiu.",
-            "cups": "El CUPS és obligatori.",
             "energy_by_periods.P1": "El consum del període P1 ha de ser positiu o zero.",
         }
     }
 
 
-@pytest.mark.parametrize("cups", ["ES1234123456789012XY", "ES001234567890123456", 123, None])
+@pytest.mark.parametrize("cups", ["ES1234123456789012XY", "ES001234567890123456", 123, False, [], {}])
 def test_compare_rejects_invalid_manual_cups(cups):
     response = create_app().test_client().post("/api/compare", json=build_payload(cups=cups))
     assert response.status_code == 400
@@ -127,6 +126,28 @@ def test_compare_normalizes_manual_cups():
     )
     assert response.status_code == 200
     assert response.get_json()["customer"]["cups"] == "ES1234123456789012JY1F"
+
+
+@pytest.mark.parametrize("fields", [("cups",), ("titular",), ("cups", "titular")])
+@pytest.mark.parametrize("empty", [None, "", " \t ", "omitted"])
+def test_optional_identity_does_not_change_calculation(fields, empty):
+    client = create_app().test_client()
+    original = client.post("/api/compare", json=build_payload()).get_json()
+    payload = build_payload()
+    for field in fields:
+        if empty == "omitted":
+            payload.pop(field)
+        else:
+            payload[field] = empty
+
+    response = client.post("/api/compare", json=payload)
+
+    assert response.status_code == 200
+    report = response.get_json()
+    assert report["comparison"] == original["comparison"]
+    assert report["breakdown"] == original["breakdown"]
+    for field in ("cups", "titular"):
+        assert report["customer"][field] == ("" if field in fields else original["customer"][field])
 
 
 def test_component_costs_are_optional_and_do_not_change_simulation_total():

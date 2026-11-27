@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import EmailComposer from './EmailComposer'
-import { extractionSummary, optionalCostFields, optionalCostIssueFields } from './extractionFeedback.js'
+import { extractionSummary, optionalCostFields, optionalCostIssueFields, optionalIdentityFields, optionalIdentityIssueFields } from './extractionFeedback.js'
 
 const apiBaseUrl = '/api'
 const appVersion = __APP_VERSION__
@@ -31,8 +31,6 @@ const initialForm = {
 }
 
 const reviewableFormFields = new Set([
-  'cups',
-  'titular',
   'billing_days',
   'competitor_invoice_amount',
   'meter_rental_eur',
@@ -412,8 +410,9 @@ function CompareScreen() {
     extractionIssues.map((issue) => issue.field).filter((field) => reviewableFormFields.has(field)),
   )
   const optionalIssueFields = optionalCostIssueFields(extractionIssues, form)
+  const identityIssueFields = optionalIdentityIssueFields(extractionIssues, form)
   const extractionOnlyIssues = extractionIssues.filter((issue) => (
-    !reviewableFormFields.has(issue.field) && !optionalCostFields.has(issue.field)
+    !reviewableFormFields.has(issue.field) && !optionalCostFields.has(issue.field) && !optionalIdentityFields.has(issue.field)
   ))
 
   return (
@@ -430,7 +429,7 @@ function CompareScreen() {
             <FieldError error={errors.pdf} />
           </label>
           {extractingInvoice && <p className="field-help">Extraient dades de la factura...</p>}
-          {extractedFileName && <p className="status-message" role="status">{extractionSummary(extractedFileName, formIssueFields.size, optionalIssueFields.size)}</p>}
+          {extractedFileName && <p className="status-message" role="status">{extractionSummary(extractedFileName, formIssueFields.size, optionalIssueFields.size, identityIssueFields.size)}</p>}
           {extractionOnlyIssues.length > 0 && (
             <p className="field-help">
               No s'ha pogut extreure, però no afecta el càlcul: {extractionOnlyIssues.map((issue) => extractionOnlyFieldLabels[issue.field] ?? issue.field).join(', ')}.
@@ -458,7 +457,7 @@ function CompareScreen() {
             <h3>Titular i contracte</h3>
             <div className="two-column-grid">
               <label>
-                Titular
+                Titular (opcional)
                 <input
                   name="titular"
                   autoComplete="name"
@@ -466,10 +465,10 @@ function CompareScreen() {
                   onChange={(event) => updateField('titular', event.target.value)}
                 />
                 <FieldError error={errors.titular} />
-                <FieldIssue issues={extractionIssues} field="titular" />
+                {identityIssueFields.has('titular') && <span className="field-help">Titular no extret. Podeu deixar-lo en blanc.</span>}
               </label>
               <label>
-                CUPS
+                CUPS (opcional)
                 <input
                   name="cups"
                   autoComplete="on"
@@ -477,7 +476,7 @@ function CompareScreen() {
                   onChange={(event) => updateField('cups', event.target.value)}
                 />
                 <FieldError error={errors.cups} />
-                <FieldIssue issues={extractionIssues} field="cups" />
+                {identityIssueFields.has('cups') && <span className="field-help">CUPS no extret o no validat. Podeu deixar-lo en blanc.</span>}
               </label>
             </div>
           </section>
@@ -767,8 +766,8 @@ function CompareScreen() {
 
             <section className="mini-section">
               <h3>Dades</h3>
-              <p><strong>Titular:</strong> {preview.customer.titular}</p>
-              <p><strong>CUPS:</strong> {preview.customer.cups}</p>
+              {preview.customer.titular && <p><strong>Titular:</strong> {preview.customer.titular}</p>}
+              {preview.customer.cups && <p><strong>CUPS:</strong> {preview.customer.cups}</p>}
               <p><strong>Dies:</strong> {preview.input.billing_days}</p>
               <p><strong>Flux Solar:</strong> {formatKwh(preview.breakdown.flux_solar_kwh)}</p>
               {preview.breakdown.flux_solar_kwh > 0 && (

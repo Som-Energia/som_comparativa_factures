@@ -190,10 +190,13 @@
           {% for paragraph in content.hero.intro %}
           <p>{{ paragraph }}</p>
           {% endfor %}
+          {% if report.customer.titular or report.customer.cups %}
           <p>
-            {{ content.hero.customer_labels.titular }}: <strong>{{ report.customer.titular }}</strong><br>
-            {{ content.hero.customer_labels.cups }}: <strong>{{ report.customer.cups }}</strong>
+            {% if report.customer.titular %}{{ content.hero.customer_labels.titular }}: <strong>{{ report.customer.titular }}</strong>{% endif %}
+            {% if report.customer.titular and report.customer.cups %}<br>{% endif %}
+            {% if report.customer.cups %}{{ content.hero.customer_labels.cups }}: <strong>{{ report.customer.cups }}</strong>{% endif %}
           </p>
+          {% endif %}
           <div class="badge">{{ content.hero.badge_text }}</div>
         </div>
 
@@ -239,8 +242,8 @@
       <div class="detail-grid">
         <div class="card">
           <h3>{{ content.invoice_card.title }}</h3>
-          <div class="meta-row"><strong>{{ content.invoice_card.labels.titular }}:</strong> {{ report.customer.titular }}</div>
-          <div class="meta-row"><strong>{{ content.invoice_card.labels.cups }}:</strong> {{ report.customer.cups }}</div>
+          {% if report.customer.titular %}<div class="meta-row"><strong>{{ content.invoice_card.labels.titular }}:</strong> {{ report.customer.titular }}</div>{% endif %}
+          {% if report.customer.cups %}<div class="meta-row"><strong>{{ content.invoice_card.labels.cups }}:</strong> {{ report.customer.cups }}</div>{% endif %}
            <div class="meta-row"><strong>{{ content.invoice_card.labels.billing_days }}:</strong> {{ report.input.billing_days }}</div>
            <div class="meta-row"><strong>{{ content.invoice_card.labels.flux_solar }}:</strong> {{ report.breakdown.flux_solar_kwh }} kWh</div>
         </div>

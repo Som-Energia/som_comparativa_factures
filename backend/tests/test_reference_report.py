@@ -6,6 +6,8 @@ import fitz
 import pytest
 
 from app import create_app
+from app.config import resolve_comparison_template_bundle
+from app.services.calculator import build_comparison_report
 from app.services import reporting
 
 
@@ -72,6 +74,44 @@ def test_reference_template_pdf_preserves_static_pages_and_renders_calculation_p
     assert len(energy_values) == 3
     assert all(abs(word[1] - power_label[1]) < 1 for word in power_values)
     assert all(abs(word[1] - energy_label[1]) < 1 for word in energy_values)
+
+
+@pytest.mark.parametrize("version", ["v1", "v2", "v3"])
+@pytest.mark.parametrize("locale", ["ca", "es"])
+@pytest.mark.parametrize("audience", ["individual", "business"])
+@pytest.mark.parametrize("fields", [("cups",), ("titular",), ("cups", "titular")])
+def test_report_omits_missing_identity_labels(version, locale, audience, fields):
+    payload = _payload()
+    for field in fields:
+        payload.pop(field)
+    app = create_app()
+    with app.test_request_context():
+        report = build_comparison_report(payload)
+        bundle = resolve_comparison_template_bundle(version)
+        html = reporting.render_report_html_for_bundle(report, bundle, locale, audience)
+
+    assert ("CUPS:" in html) is ("cups" not in fields)
+    assert ("Titular:" in html) is ("titular" not in fields)
+    for field in ("cups", "titular"):
+        assert (_payload()[field] in html) is (field not in fields)
+    if len(fields) == 2:
+        assert '<div class="identity">' not in html
+
+
+@pytest.mark.parametrize("locale", ["ca", "es"])
+@pytest.mark.parametrize("audience", ["individual", "business"])
+def test_pdf_without_identity_preserves_pages_and_calculation(locale, audience):
+    payload = _payload() | {"cups": None, "titular": "  ", "locale": locale, "audience": audience}
+    response = create_app().test_client().post("/api/reports/comparison.pdf", json=payload)
+
+    assert response.status_code == 200
+    with fitz.open(stream=response.data, filetype="pdf") as document:
+        assert document.page_count == 5
+        text = document[2].get_text()
+        assert "Titular:" not in text
+        assert "CUPS:" not in text
+        assert "28,00 €" in text
+        assert "14,01 €" in text
 
 
 def test_reference_page_resolves_outfit_fonts_from_assets_root(monkeypatch):

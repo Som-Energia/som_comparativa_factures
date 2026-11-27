@@ -176,14 +176,11 @@ def _validate_payload(payload: dict) -> ComparisonInput:
 
     raw_cups = payload.get("cups", "")
     cups = normalize_cups(raw_cups) if isinstance(raw_cups, str) else ""
-    if raw_cups is None or (isinstance(raw_cups, str) and not raw_cups.strip()):
-        errors["cups"] = "El CUPS és obligatori."
-    elif not is_valid_cups(cups):
+    if raw_cups is not None and (not isinstance(raw_cups, str) or raw_cups.strip()) and not is_valid_cups(cups):
         errors["cups"] = "El CUPS no té un format o unes lletres de control vàlids."
 
-    titular = str(payload.get("titular", "")).strip()
-    if not titular:
-        errors["titular"] = "El titular és obligatori."
+    raw_titular = payload.get("titular")
+    titular = str(raw_titular).strip() if raw_titular is not None else ""
 
     billing_days_raw = payload.get("billing_days")
     try:
