@@ -99,6 +99,9 @@ RETAILERS = {
     "plenitude": "Plenitude",
     "pepeenergy": "Pepeenergy",
     "pepephone": "Pepeenergy",
+    "bon preu": "Bonpreu Esclat Energia",
+    "bonpreu esclat": "Bonpreu Esclat Energia",
+    "bonpreuesclat": "Bonpreu Esclat Energia",
 }
 TITULAR_VALUE_EXCLUSIONS = {"POTENCIA"}
 
@@ -1503,6 +1506,153 @@ def _extract_octopus_fields(text: str, result: dict[str, Any]) -> None:
         result["electric_tax_rate_percent"] = normalize_number(rate.group(1))
 
 
+def _extract_bonpreu_fields(
+    text: str, words: list[tuple[Any, ...]] | None, result: dict[str, Any],
+) -> None:
+    """Use billed sections, excluding rounded readings and the allocation chart."""
+    def unique(field: str, values: set) -> Any:
+        if len(values) > 1:
+            add_issue(result, field, "conflicting_values", "La factura conté valors contradictoris per a aquest camp. Cal revisar-lo.")
+        return next(iter(values)) if len(values) == 1 else None
+
+    def amount(field: str, label: str) -> float | None:
+        label = label.replace(" ", r"\s+")
+        return unique(field, {
+            normalize_number(match[1]) for match in re.finditer(
+                rf"{label}\s*:?[ \t]*({NUMBER_PATTERN})\s*(?:€|EUR\b)(?!\s*/)",
+                text, re.IGNORECASE,
+            )
+        })
+
+    # The CUPS label ends a long sentence. Its value aligns with the sentence's
+    # start, not with the word '(CUPS)'. This also identifies the column boundary.
+    holder_rows, cups_rows = [], []
+    if words:
+        column_boundaries = {}
+        for label in words:
+            if not re.fullmatch(r"\(CUPS\):?", label[5], re.IGNORECASE):
+                continue
+            row = sorted((word for word in words if word[0] == label[0]
+                          and abs(word[2] - label[2]) < 3), key=lambda word: word[1])
+            starts = [index for index, word in enumerate(row) if word[5].casefold() == "número"
+                      and re.match(r"número que identifica", " ".join(item[5] for item in row[index:]), re.IGNORECASE)]
+            if len(starts) != 1:
+                continue
+            left = row[starts[0]][1]
+            column_boundaries[label[0]] = left
+            below = [word for word in words if word[0] == label[0]
+                     and label[4] < word[2] < label[4] + 25 and word[1] >= left - 2]
+            if below:
+                top = min(word[2] for word in below)
+                cups_rows.append(" ".join(word[5] for word in sorted(below, key=lambda word: word[1])
+                                          if abs(word[2] - top) < 3))
+        for holder in words:
+            if holder[5].casefold() != "titular:":
+                continue
+            row = sorted((word for word in words if word[0] == holder[0]
+                          and abs(word[2] - holder[2]) < 3), key=lambda word: word[1])
+            left = min((word[1] for word in row if word[5].casefold() == "tarifa"
+                        and word[1] > holder[3]), default=column_boundaries.get(holder[0]))
+            if left is not None:
+                holder_rows.append(" ".join(word[5] for word in row if holder[3] < word[1] < left - 2))
+    else:
+        holder_rows = [re.split(r"\s{2,}|\s+Tarifa\b", match[1], maxsplit=1, flags=re.IGNORECASE)[0].strip()
+                       for match in re.finditer(r"^\s*Titular:[ \t]*([^\n]+)", text, re.IGNORECASE | re.MULTILINE)]
+        cups_rows = [match[1] for match in re.finditer(
+            r"Número que identifica[^\n]*\(CUPS\):([^\n]*(?:\n[^\n]*)?)", text, re.IGNORECASE,
+        )]
+    result["titular"] = unique("titular", {value for value in holder_rows if is_titular_value(value)})
+    result["cups"] = unique("cups", {normalize_cups(match[0]) for row in cups_rows
+                                      for match in CUPS_PATTERN.finditer(row) if is_valid_cups(match[0])})
+
+    days = {int(value) for value in re.findall(r"\(\s*(?:Dies|Días):\s*(\d{1,3})\s*\)", text, re.IGNORECASE)}
+    days.update(int(value) for value in re.findall(
+        r"(?:Els dies que comprèn aquesta factura|Los días que comprende esta factura)\s+(\d{1,3})\s+(?:dies|días)\b", text, re.IGNORECASE,
+    ))
+    result["billing_days"] = unique("billing_days", {day for day in days if day > 0})
+    energy_heading = r"(?:Per l'electricitat que has fet servir|Por la electricidad que has consumido)"
+    power_heading = r"(?:Per la potència contractada|Por la potencia contratada)"
+    energy_total = r"(?:El que et costa aquest mes l'energia consumida|Lo que te cuesta este mes la energía consumida)"
+    power_total = r"(?:El que et costa aquest mes la potència contractada|Lo que te cuesta este mes la potencia contratada)"
+    adjustment_label = r"(?:Cost d'ajustament per Red Elèctrica Espanyola|Coste de ajuste por Red Eléctrica Española)"
+    result["competitor_invoice_amount"] = amount("competitor_invoice_amount", r"(?:Importe? total de la factura|Total que et toca pagar|(?:El )?total que te toca pagar)")
+    for field, label in (
+        ("competitor_energy_eur", rf"{energy_total} \(Total (?:€|EUR)\)"),
+        ("competitor_power_eur", rf"(?:{power_total} \(Total (?:€|EUR)\)|{power_heading})"),
+        ("meter_rental_eur", r"(?:(?:El )?lloguer del comptador|(?:El )?alquiler del contador)"),
+        ("electricity_tax", r"(?:L'impost per l'electricitat que pagues a l'Estat|El impuesto por la electricidad que pagas al Estado)"),
+        ("vat_amount", r"\bIVA\s+\d+(?:[.,]\d+)?\s*%"),
+    ):
+        result[field] = amount(field, label)
+    for field, pattern in (
+        ("electric_tax_rate_percent", r"(?:Impost|Impuesto) especial del (\d+(?:[.,]\d+)?)\s*%"),
+        ("vat_rate_percent", r"\bIVA\s+(\d+(?:[.,]\d+)?)\s*%"),
+    ):
+        result[field] = unique(field, {normalize_number(value) for value in re.findall(pattern.replace(" ", r"\s+"), text, re.IGNORECASE)})
+
+    sections = {}
+    for kind, heading, end in (
+        ("energy", energy_heading, rf"Cost d'ajustament|Coste de ajuste|{energy_total}"),
+        ("power", power_heading, rf"{power_total}|{energy_heading}"),
+    ):
+        sections[kind] = re.findall(rf"^\s*{heading}\s*\n(.*?)(?=^\s*(?:{end})|\Z)",
+                                    text, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+    for kind, field, label, unit, periods in (
+        ("energy", "energy_by_periods", r"(?:El que has consumit aquest mes|Lo que has consumido este mes)", "kWh", ("P1", "P2", "P3")),
+        ("power", "contracted_power_kw_by_periods", r"(?:La potència que tens contractada|La potencia que tienes contratada)", "kW", ("P1", "P2")),
+    ):
+        candidates = {period: set() for period in periods}
+        has_period_detail = False
+        for section in sections[kind]:
+            blocks = re.split(r"\bPer[ií]od[eo]\s+([123])\b", section, flags=re.IGNORECASE)
+            has_period_detail |= len(blocks) > 1
+            for index in range(1, len(blocks), 2):
+                period = f"P{blocks[index]}"
+                if period in candidates:
+                    candidates[period].update(normalize_number(value) for value in re.findall(
+                        rf"{label}\s+({POWER_PATTERN})\s*{unit}\b", blocks[index + 1], re.IGNORECASE,
+                    ))
+        # Older flat-price bills have no period breakdown in billed energy.
+        # Read explicit consumption rows, never cumulative meter readings.
+        if kind == "energy" and not has_period_detail:
+            for readings in re.findall(
+                r"Informaci[oó]n? del consum(?:o)? el[eèé]ctric(?:o)?(.*?)Total consum(?:o)? (?:dels|de los) per[ií]od[eo]s",
+                text, re.IGNORECASE | re.DOTALL,
+            ):
+                blocks = re.split(r"\bPer[ií]od[eo]\s+([123])\b", readings, flags=re.IGNORECASE)
+                for index in range(1, len(blocks), 2):
+                    candidates[f"P{blocks[index]}"].update(normalize_number(value) for value in re.findall(
+                        rf"Consum(?:o)? total del per[ií]od[eo]:\s*({POWER_PATTERN})\s*kWh\b",
+                        blocks[index + 1], re.IGNORECASE,
+                    ))
+        if kind == "power":
+            for p1, p2 in re.findall(
+                rf"(?:Potència contractada|Potencia contratada)\s*\(kW\):\s*({POWER_PATTERN})\s*kW\s*-\s*({POWER_PATTERN})\s*kW\b",
+                text, re.IGNORECASE,
+            ):
+                candidates["P1"].add(normalize_number(p1))
+                candidates["P2"].add(normalize_number(p2))
+        result[field] = {"P1": None, "P2": None, "P3": None}
+        for period, values in candidates.items():
+            result[field][period] = unique(f"{field}.{period}", values)
+
+    energy_summary = amount("competitor_energy_eur", energy_heading)
+    adjustment = amount("competitor_energy_eur", rf"(?:{adjustment_label})")
+    energy, power = result["competitor_energy_eur"], result["competitor_power_eur"]
+    if energy_summary is not None and energy is not None:
+        if abs(Decimal(str(energy_summary)) - Decimal(str(energy)) - Decimal(str(adjustment or 0))) > Decimal("0.02"):
+            result["competitor_energy_eur"] = None
+            add_issue(result, "competitor_energy_eur", "energy_total_mismatch",
+                      "No es pot conciliar l'energia del detall amb el resum i els serveis d'ajust. Cal revisar-la.")
+    components = [energy_summary, power, result["electricity_tax"], result["meter_rental_eur"],
+                  amount("competitor_invoice_amount", r"(?:Repercussió bo social|Repercusión bono social)"), result["vat_amount"]]
+    total = result["competitor_invoice_amount"]
+    if total is not None and all(value is not None for value in components):
+        if abs(sum(Decimal(str(value)) for value in components) - Decimal(str(total))) > Decimal("0.02"):
+            add_issue(result, "competitor_invoice_amount", "invoice_total_mismatch",
+                      "La suma dels conceptes facturats no coincideix amb el total. Cal revisar-la.")
+
+
 def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> dict[str, Any]:
     """Apply deterministic extraction rules to native PDF text."""
     result = empty_result()
@@ -1525,6 +1675,9 @@ def extract_from_text(text: str, words: list[tuple[Any, ...]] | None = None) -> 
     result["self_consumption_surplus_kwh"] = extract_surplus_kwh(text)
     if result["retailer"] == "Octopus Energy":
         _extract_octopus_fields(text, result)
+    if result["retailer"] == "Bonpreu Esclat Energia":
+        _extract_bonpreu_fields(text, words, result)
+        derived = False
     access_tariff = extract_access_tariff(text, words)
     if access_tariff == "2.0TD":
         result["contracted_power_kw_by_periods"]["P3"] = None
