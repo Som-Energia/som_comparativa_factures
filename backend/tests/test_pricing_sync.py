@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime
 import json
+import logging
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -9,7 +10,7 @@ import app.config as app_config
 from app.config import load_pricing_config, update_pricing_config
 from app.services.calculator import build_comparison_report
 from app.services.erp_pricing import ERPPriceClient, ERPPriceError, ERPSettings, map_erp_adjustment_prices, map_erp_prices
-from app.services.pricing_sync import MADRID_TIMEZONE, _seconds_until_next_sync, sync_pricing
+from app.services.pricing_sync import MADRID_TIMEZONE, _seconds_until_next_sync, run_forever, sync_pricing
 
 
 def erp_prices(**overrides):
@@ -156,7 +157,12 @@ def test_update_pricing_config_preserves_form_controlled_values(pricing_config):
     assert persisted["vat_rate"] == 0.21
 
 
-def test_sync_pricing_uses_a_31_day_lookahead(pricing_config, monkeypatch):
+@pytest.mark.parametrize(("now", "target_date"), [
+    (datetime(2026, 8, 31, 12, tzinfo=UTC), date(2026, 10, 8)),
+    (datetime(2026, 11, 25, 12, tzinfo=UTC), date(2027, 1, 2)),
+    (datetime(2026, 11, 26, 12, tzinfo=UTC), date(2027, 1, 3)),
+])
+def test_sync_pricing_uses_a_38_day_lookahead(pricing_config, monkeypatch, now, target_date):
     captured_dates = []
 
     class FakeClient:
@@ -173,12 +179,58 @@ def test_sync_pricing_uses_a_31_day_lookahead(pricing_config, monkeypatch):
     monkeypatch.setattr("app.services.pricing_sync.ERPPriceClient", FakeClient)
     monkeypatch.setattr("app.services.pricing_sync.ERPSettings.from_environment", lambda: object())
 
-    sync_pricing(datetime(2026, 8, 31, 12, tzinfo=UTC))
+    sync_pricing(now)
 
-    assert captured_dates == [date(2026, 10, 1)]
+    assert captured_dates == [target_date]
     assert load_pricing_config()["effective_date"] == "2026-10-01"
     assert load_pricing_config()["adjustment_service_prices_eur_per_kwh"] == {"P1": 0.001, "P2": 0.002, "P3": 0.003}
     assert load_pricing_config()["adjustment_service_price_date"] == "2026-08-01"
+
+
+def test_sync_logs_tariff_adjustments_and_successful_save(pricing_config, monkeypatch, caplog):
+    client = Mock()
+    client.fetch_tariff_prices.return_value = erp_prices(version_name="2.0TD_SOM 2027-01-01", start_date="2027-01-01")
+    client.fetch_adjustment_prices.return_value = erp_adjustment_prices()
+    monkeypatch.setattr("app.services.pricing_sync.ERPPriceClient", lambda _settings: client)
+    monkeypatch.setattr("app.services.pricing_sync.ERPSettings.from_environment", lambda: object())
+
+    with caplog.at_level(logging.INFO, logger="app.services.pricing_sync"):
+        sync_pricing(datetime(2026, 11, 25, 12, tzinfo=UTC))
+
+    assert "data consultada=2027-01-02" in caplog.text
+    assert "tarifa=2.0TD_SOM 2027-01-01, entrada en vigor=2027-01-01" in caplog.text
+    assert "Serveis d'ajust rebuts i validats: data=2026-08-01" in caplog.text
+    assert "Preus sincronitzats i desats correctament" in caplog.text
+    assert "Durada=" in caplog.text
+    assert load_pricing_config()["effective_date"] == "2027-01-01"
+
+
+def test_service_logs_failure_and_schedules_next_daily_attempt(pricing_config, monkeypatch, caplog):
+    before = pricing_config.read_bytes()
+    client = Mock()
+    client.fetch_tariff_prices.return_value = erp_prices()
+    client.fetch_adjustment_prices.side_effect = ERPPriceError("Serveis d'ajust no disponibles")
+    monkeypatch.setattr("app.services.pricing_sync.ERPPriceClient", lambda _settings: client)
+    monkeypatch.setattr("app.services.pricing_sync.ERPSettings.from_environment", lambda: object())
+    sleep_mock = Mock(side_effect=KeyboardInterrupt)
+    monkeypatch.setattr("app.services.pricing_sync.sleep", sleep_mock)
+
+    with caplog.at_level(logging.INFO, logger="app.services.pricing_sync"):
+        with pytest.raises(KeyboardInterrupt):
+            run_forever()
+
+    assert "Servei pricing-sync iniciat: marge=38 dies" in caplog.text
+    assert "cada dia a les 00:10 (Europe/Madrid)" in caplog.text
+    assert "Consultant els serveis d'ajust" in caplog.text
+    errors = [record for record in caplog.records if record.levelno == logging.ERROR]
+    assert len(errors) == 1
+    assert errors[0].exc_info[0] is ERPPriceError
+    assert "Serveis d'ajust no disponibles" in caplog.text
+    assert "Propera sincronització:" in caplog.text
+    assert "Preus sincronitzats i desats correctament" not in caplog.text
+    assert pricing_config.read_bytes() == before
+    sleep_mock.assert_called_once()
+    assert 0 < sleep_mock.call_args.args[0] <= 24 * 60 * 60
 
 
 def test_sync_pricing_keeps_existing_file_when_erp_fails(pricing_config, monkeypatch):
